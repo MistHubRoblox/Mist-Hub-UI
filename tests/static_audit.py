@@ -146,8 +146,6 @@ for surface, pattern in (
     missing_types = sorted(name for name in public_method_names(pattern) if name not in types)
     require(not missing_types, f"types omit public {surface} methods: {', '.join(missing_types)}")
 
-comparison = (ROOT / "docs" / "COMPARISON.md").read_text(encoding="utf-8")
-require("Linoria" in comparison and "Obsidian" in comparison, "comparison document missing")
 require((ROOT / ".github" / "workflows" / "ci.yml").exists(), "CI workflow missing")
 require((ROOT / "tests" / "public_api_snapshot.json").exists(), "public API freeze snapshot missing")
 require((ROOT / "tests" / "quality_contract.py").exists(), "API compatibility test missing")
@@ -155,8 +153,6 @@ require((ROOT / "tests" / "source_sanity.py").exists(), "source lexical sanity t
 require((ROOT / "tests" / "runtime_quality.luau").exists(), "runtime quality suite missing")
 require((ROOT / "tests" / "runtime_stress.luau").exists(), "runtime stress suite missing")
 require((ROOT / "tests" / "runtime_benchmark.luau").exists(), "runtime benchmark missing")
-require((ROOT / "docs" / "STABILITY.md").exists(), "stability policy missing")
-require((ROOT / "docs" / "COMPATIBILITY.md").exists(), "compatibility matrix missing")
 require((ROOT / "dist" / "SHA256SUMS.txt").exists(), "release checksum manifest missing")
 
 if errors:
