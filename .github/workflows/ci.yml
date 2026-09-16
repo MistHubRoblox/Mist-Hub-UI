@@ -1,0 +1,30 @@
+name: MistUI validation
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  static-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify deterministic distribution
+        run: python tools/build.py --check
+      - name: Run static audit
+        run: python tests/static_audit.py
+      - name: Enforce frozen public API
+        run: python tests/quality_contract.py
+      - name: Run lexical source sanity
+        run: python tests/source_sanity.py
+      - name: Audit player-facing surface
+        run: python tests/player_surface_audit.py
+      - name: Validate Test Lab source
+        run: python tests/testlab_sanity.py
+      - name: Verify release checksum
+        run: python tools/release.py --check
+      - name: Validate Python tooling
+        run: python -m py_compile tools/build.py tools/release.py tests/static_audit.py tests/quality_contract.py tests/source_sanity.py tests/player_surface_audit.py tests/testlab_sanity.py
