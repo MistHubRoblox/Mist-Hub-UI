@@ -109,7 +109,7 @@ examples/example.lua      small usage example
 examples/MistUI_TestLab.lua  development-only full component/overlay test lab
 types/                    strict public Luau declarations
 tests/                    static audits + runtime suites
-docs/                     API, stability and compatibility documentation
+docs/                     API documentation
 tools/                    deterministic build/release tooling
 .github/                   CI validation
 ```
@@ -130,10 +130,6 @@ python tools/release.py --check
 
 `dist/MistUI.lua` intentionally uses `--!nocheck`: executor analyzers vary and commonly report false positives around dynamic Luau/executor APIs. The source package still ships a strict public API contract in `types/MistUI.types.luau`.
 
-## Comparison notes
-
-See [`docs/COMPARISON.md`](docs/COMPARISON.md) for the concrete Linoria/Obsidian review that drove v4.0. The goal is measurable capability and maintainability, not a claim that one visual style is objectively preferable to every other UI library.
-
 ## Publishing
 
 No license is chosen automatically. Select a license before publishing the repository if you want others to reuse or redistribute it under explicit terms.
@@ -141,7 +137,7 @@ No license is chosen automatically. Select a license before publishing the repos
 
 ## v4 stability contract
 
-MistUI v4 treats documented public APIs as stable for the entire major version. CI compares the distribution against `tests/public_api_snapshot.json`; removing a frozen public method fails validation. Breaking changes are reserved for a future v5. See `docs/STABILITY.md`.
+MistUI v4 treats documented public APIs as stable for the entire major version. CI compares the distribution against `tests/public_api_snapshot.json`; removing a frozen public method fails validation. Breaking changes are reserved for a future v5.
 
 ## Quality tools
 
@@ -155,7 +151,7 @@ end)
 Window:OpenDebugPanel()
 ```
 
-`Doctor` is diagnostic, not a substitute for target-runtime testing. The compatibility matrix records only environments that have actually been tested.
+`Doctor` is diagnostic, not a substitute for target-runtime testing.
 ### Persistence behavior
 MistUI configs are intended to be persistent. The library detects common executor filesystem APIs and uses flat files when directory creation is unavailable. If the runtime exposes no durable storage API at all, MistUI reports persistence as unavailable instead of pretending in-memory storage is permanent. A custom persistent `StorageAdapter` can also be supplied.
 
