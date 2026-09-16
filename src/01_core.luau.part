@@ -1,0 +1,2110 @@
+local Library = {}
+Library.__index = Library
+Library.Architecture = {
+    Distribution = "single-file",
+    SourceLayout = "modular-build-fragments",
+    Core = "Signal/Maid/Store/ThemeBindings",
+    Managers = "Overlay/Keybind/Config/Notifications",
+    WindowModel = "single-active-window-per-library-instance",
+    Version = 4.0,
+}
+Library.SupportsMultipleWindows = false
+Library.ReleaseBuild = true
+Library.Capabilities = {
+    ModernComponents = true,
+    StableIds = true,
+    DeclarativeKeybinds = true,
+    ThemeBindings = true,
+    AdaptiveBreakpoints = true,
+    KeyboardNavigation = true,
+    GamepadNavigation = true,
+    TouchTooltips = true,
+    MemoryStorage = true,
+    ExecutorStorage = true,
+    OverlayStack = true,
+    ColorPicker = true,
+    Viewport = true,
+    Video = true,
+    UIPassthrough = true,
+    AdvancedInput = true,
+    PressKeybindMode = true,
+    CommandRegistry = true,
+    ResizableWindows = false,
+    KeybindChords = true,
+    AdvancedDropdown = true,
+    DependencyBoxes = true,
+    QualitySuite = true,
+    Doctor = true,
+    LeakDiagnostics = true,
+    Profiler = true,
+    DebugPanel = true,
+    ConfigTransactions = true,
+    ConfigValidation = true,
+    ErrorBoundaries = true,
+    APIContracts = true,
+    VirtualizedLargeLists = true,
+    LayoutSnapshots = true,
+    ActivityHUD = true,
+}
+
+
+------------------------------------------------------------
+-- SERVICES
+------------------------------------------------------------
+local TweenService     = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Players          = game:GetService("Players")
+local CoreGui          = game:GetService("CoreGui")
+local RunService       = game:GetService("RunService")
+local GuiService       = game:GetService("GuiService")
+
+local function isTextInputFocused()
+    local ok, focused = pcall(function()
+        return UserInputService:GetFocusedTextBox()
+    end)
+    return ok and focused ~= nil
+end
+
+local LocalPlayer = Players.LocalPlayer
+
+------------------------------------------------------------
+-- TYPOGRAPHY
+-- Builder Sans: clean, modern and well suited for compact Roblox UI.
+------------------------------------------------------------
+local function uiFont(weight)
+    return Font.new(
+        "rbxasset://fonts/families/BuilderSans.json",
+        weight or Enum.FontWeight.Regular,
+        Enum.FontStyle.Normal
+    )
+end
+
+------------------------------------------------------------
+-- TEMA (valores exatos extraídos da imagem de referência)
+------------------------------------------------------------
+local Theme = {
+    Background      = Color3.fromHex("#161618"),  -- base geral
+    TitleBar        = Color3.fromHex("#18181b"),  -- nível 1
+    Sidebar         = Color3.fromHex("#121214"),  -- nível mais escuro
+    TabBar          = Color3.fromHex("#18181b"),
+    Content         = Color3.fromHex("#19191c"),  -- nível 2
+    Field           = Color3.fromHex("#121214"),  -- nível de interação
+    FieldHover      = Color3.fromHex("#1a1a1e"),
+    Card            = Color3.fromHex("#1e1e22"),  -- nível 3
+    CardHover       = Color3.fromHex("#242429"),
+    Stroke          = Color3.fromHex("#2a2a2f"),
+    StrokeSoft      = Color3.fromHex("#222226"),
+    StrokeTabBar    = Color3.fromHex("#2d2d32"),
+    SearchStroke    = Color3.fromHex("#202024"),
+    SearchStrokeFocus = Color3.fromHex("#4a4a50"),
+    Text            = Color3.fromRGB(248, 248, 249),   -- branco (Explorer, tab ativa)
+    TextTabInactive = Color3.fromRGB(210, 210, 213),   -- branco (tabs inativas, conforme referência)
+    TextDark        = Color3.fromRGB(158, 158, 164),   -- cinza (título, headers SCRIPTS)
+    TextDimmer      = Color3.fromRGB(126, 126, 132),   -- cinza mais apagado (ícones)
+    Accent          = Color3.fromHex("#f8f8f9"),       -- sublinhado da tab ativa
+    Success         = Color3.fromRGB(74, 222, 128),
+    Error           = Color3.fromRGB(255, 132, 132),
+    Warning         = Color3.fromRGB(250, 204, 21),
+    Info            = Color3.fromRGB(200, 200, 200),
+    PrimaryText     = Color3.fromRGB(15, 15, 15),      -- text over Accent buttons
+    SurfaceTint     = Color3.fromRGB(255, 255, 255),   -- ultra-subtle surface tint
+    SettingsBackdrop = Color3.fromRGB(8, 8, 10),       -- Settings frosted backdrop
+    ToggleKnobActive = Color3.fromRGB(20, 20, 22), -- active toggle knob
+    Font         = uiFont(Enum.FontWeight.Regular),
+    FontMedium   = uiFont(Enum.FontWeight.Medium),
+    FontSemibold = uiFont(Enum.FontWeight.SemiBold),
+    FontBold     = uiFont(Enum.FontWeight.Bold),
+
+    Metrics = {
+        WindowRadius = 10,
+        CardRadius = 10,
+        ControlRadius = 6,
+        OverlayRadius = 10,
+
+        ControlHeightSmall = 28,
+        ControlHeight = 34,
+        ControlHeightLarge = 38,
+
+        SpaceXS = 4,
+        SpaceS = 8,
+        SpaceM = 12,
+        SpaceL = 16,
+        SpaceXL = 22,
+
+        IconS = 14,
+        IconM = 18,
+        IconL = 22,
+
+        TouchTarget = 40,
+    },
+
+    Motion = {
+        Instant = 0.08,
+        Fast = 0.10,
+        Normal = 0.18,
+        Slow = 0.24,
+    },
+}
+
+Library.Theme = Theme
+Library.Metrics = Theme.Metrics
+Library.Motion = Theme.Motion
+
+Library.ThemeColorKeys = Library.ThemeColorKeys or {
+    "Background", "TitleBar", "Sidebar", "TabBar", "Content",
+    "Field", "FieldHover", "Card", "CardHover", "Stroke", "StrokeSoft",
+    "StrokeTabBar", "SearchStroke", "SearchStrokeFocus", "Text",
+    "TextTabInactive", "TextDark", "TextDimmer", "Accent", "Success",
+    "Error", "Warning", "Info", "PrimaryText", "SurfaceTint",
+    "SettingsBackdrop", "ToggleKnobActive",
+}
+Library.ThemeDerivedFactors = Library.ThemeDerivedFactors or {
+    0.72, 0.80, 0.90, 0.92, 0.96, 1.025, 1.04, 1.05, 1.08, 1.12, 1.16, 1.20,
+}
+
+function Library:_ThemeShade(color, factor)
+    return Color3.new(
+        math.clamp(color.R * factor, 0, 1),
+        math.clamp(color.G * factor, 0, 1),
+        math.clamp(color.B * factor, 0, 1)
+    )
+end
+
+function Library:_ColorNear(a, b)
+    if typeof(a) ~= "Color3" or typeof(b) ~= "Color3" then return false end
+    local epsilon = 1 / 510
+    return math.abs(a.R - b.R) <= epsilon
+        and math.abs(a.G - b.G) <= epsilon
+        and math.abs(a.B - b.B) <= epsilon
+end
+
+function Library:_ThemeBindingForColor(value, sourceTheme)
+    if typeof(value) ~= "Color3" then return nil end
+    sourceTheme = sourceTheme or Theme
+
+    for _, key in ipairs(self.ThemeColorKeys) do
+        local base = sourceTheme[key]
+        if typeof(base) == "Color3" then
+            if self:_ColorNear(value, base) then
+                return key, nil
+            end
+
+            for _, factor in ipairs(self.ThemeDerivedFactors) do
+                if self:_ColorNear(value, self:_ThemeShade(base, factor)) then
+                    return key, factor
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+Library.Flags = Library.Flags or {}
+Library.ComponentsByFlag = Library.ComponentsByFlag or {}
+
+------------------------------------------------------------
+-- MIST UI FRAMEWORK CORE
+------------------------------------------------------------
+Library.Version = "4.0.0"
+Library.SchemaVersion = 5
+Library.DebugEnabled = false
+Library.AnimationSettings = Library.AnimationSettings or {
+    Enabled = true,
+    Speed = 1,
+    ReducedMotion = false,
+}
+Library.Locale = Library.Locale or "en"
+Library.Locales = Library.Locales or {
+    en = {},
+    pt = {},
+}
+Library.ConfigMigrations = Library.ConfigMigrations or {}
+Library.ThemeRegistry = Library.ThemeRegistry or {}
+Library.ActiveNotifications = Library.ActiveNotifications or {}
+Library._zIndexCounter = Library._zIndexCounter or 250
+Library._themeBindings = Library._themeBindings
+    or setmetatable({}, { __mode = "k" })
+
+-- Quality/diagnostic state is intentionally lightweight in release builds.
+-- Detailed records are capped to prevent debugging itself from becoming a leak.
+Library.Diagnostics = Library.Diagnostics or {
+    SafeCalls = 0,
+    CallbackErrors = 0,
+    Warnings = 0,
+    Records = {},
+    MaxRecords = 100,
+}
+
+local function diagnosticCopy(value, seen)
+    local luaType = type(value)
+    local robloxType = typeof(value)
+
+    -- Diagnostics/default snapshots must never keep strong references to the UI
+    -- tree, callbacks, threads or executor userdata. Keep primitives as-is and
+    -- stringify opaque/runtime objects so debug tooling cannot become a leak.
+    if robloxType == "Instance" then
+        local ok, fullName = pcall(function() return value:GetFullName() end)
+        return ok and ("<Instance:" .. tostring(fullName) .. ">")
+            or ("<Instance:" .. tostring(value) .. ">")
+    end
+    if luaType == "function" or luaType == "thread" or luaType == "userdata" then
+        return "<" .. luaType .. ":" .. tostring(value) .. ">"
+    end
+    if luaType ~= "table" then return value end
+
+    seen = seen or {}
+    if seen[value] then return "<cycle>" end
+    seen[value] = true
+    local out = {}
+    for k, v in pairs(value) do
+        local safeKey = diagnosticCopy(k, seen)
+        if type(safeKey) == "table" then safeKey = tostring(k) end
+        out[safeKey] = diagnosticCopy(v, seen)
+    end
+    seen[value] = nil
+    return out
+end
+
+-- Component defaults/config-facing values need an ordinary deep table copy that
+-- preserves Roblox values/Instances. Keep this separate from diagnosticCopy,
+-- whose job is specifically to avoid retaining runtime objects in debug logs.
+local function componentValueCopy(value, seen)
+    if type(value) ~= "table" then return value end
+    seen = seen or {}
+    if seen[value] then return seen[value] end
+    local out = {}
+    seen[value] = out
+    for k, v in pairs(value) do
+        out[componentValueCopy(k, seen)] = componentValueCopy(v, seen)
+    end
+    return out
+end
+
+function Library:_RecordDiagnostic(kind, message, context)
+    local diagnostics = self.Diagnostics
+    kind = tostring(kind or "Info")
+    if kind == "Error" then diagnostics.CallbackErrors += 1 end
+    if kind == "Warning" then diagnostics.Warnings += 1 end
+
+    local record = {
+        Kind = kind,
+        Message = tostring(message or ""),
+        Context = diagnosticCopy(context or {}),
+        Time = os.clock(),
+    }
+
+    local traceOk, trace = pcall(function()
+        if debug and type(debug.traceback) == "function" then
+            return debug.traceback(nil, 3)
+        end
+        return nil
+    end)
+    if traceOk and trace then record.Traceback = tostring(trace) end
+
+    table.insert(diagnostics.Records, record)
+    local maxRecords = math.max(10, tonumber(diagnostics.MaxRecords) or 100)
+    while #diagnostics.Records > maxRecords do
+        table.remove(diagnostics.Records, 1)
+    end
+    return record
+end
+
+function Library:GetDiagnostics()
+    return diagnosticCopy(self.Diagnostics)
+end
+
+function Library:ClearDiagnostics()
+    self.Diagnostics.SafeCalls = 0
+    self.Diagnostics.CallbackErrors = 0
+    self.Diagnostics.Warnings = 0
+    table.clear(self.Diagnostics.Records)
+    return true
+end
+
+function Library:BindTheme(instance, property, token, transform)
+    if typeof(instance) ~= "Instance" then
+        return nil
+    end
+
+    token = tostring(token or "")
+    if token == "" or Theme[token] == nil then
+        return nil
+    end
+
+    local bindings = self._themeBindings[instance]
+    if not bindings then
+        bindings = {}
+        self._themeBindings[instance] = bindings
+    end
+
+    bindings[property] = {
+        Token = token,
+        Transform = transform,
+    }
+
+    local value = Theme[token]
+    if type(transform) == "function" then
+        local ok, transformed = pcall(transform, value, Theme)
+        if ok then value = transformed end
+    end
+
+    pcall(function()
+        instance[property] = value
+    end)
+
+    return instance
+end
+
+function Library:GetThemeBinding(instance, property)
+    local bindings = self._themeBindings[instance]
+    return bindings and bindings[property] or nil
+end
+
+function Library:_RebindThemeFromCurrentValues(root, sourceTheme)
+    for instance, bindings in pairs(self._themeBindings) do
+        if instance and instance.Parent then
+            local insideRoot = root == nil
+                or instance == root
+                or instance:IsDescendantOf(root)
+
+            if insideRoot then
+                for property, binding in pairs(bindings) do
+                    local ok, current = pcall(function()
+                        return instance[property]
+                    end)
+
+                    if ok and typeof(current) == "Color3" then
+                        local token, factor = self:_ThemeBindingForColor(
+                            current,
+                            sourceTheme
+                        )
+
+                        if token then
+                            binding.Token = token
+                            binding.Transform = factor and function(color)
+                                return Library:_ThemeShade(color, factor)
+                            end or nil
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+function Library:UnbindTheme(instance, property)
+    local bindings = self._themeBindings[instance]
+    if not bindings then return false end
+
+    if property ~= nil then
+        bindings[property] = nil
+    else
+        self._themeBindings[instance] = nil
+    end
+
+    return true
+end
+
+function Library:_ApplyThemeBindings(root)
+    for instance, bindings in pairs(self._themeBindings) do
+        if instance and instance.Parent then
+            local insideRoot = root == nil or instance == root or instance:IsDescendantOf(root)
+
+            if insideRoot then
+                for property, binding in pairs(bindings) do
+                    local value = Theme[binding.Token]
+
+                    if type(binding.Transform) == "function" then
+                        local ok, transformed = pcall(
+                            binding.Transform,
+                            value,
+                            Theme
+                        )
+                        if ok then value = transformed end
+                    end
+
+                    pcall(function()
+                        instance[property] = value
+                    end)
+                end
+            end
+        else
+            self._themeBindings[instance] = nil
+        end
+    end
+end
+
+local Signal = {}
+Signal.__index = Signal
+
+function Signal.new()
+    return setmetatable({ _handlers = {}, _destroyed = false }, Signal)
+end
+
+function Signal:Connect(callback)
+    if self._destroyed or type(callback) ~= "function" then
+        return { Disconnect = function() end }
+    end
+
+    local connection = { Connected = true }
+    self._handlers[connection] = callback
+
+    function connection:Disconnect()
+        if not self.Connected then return end
+        self.Connected = false
+        if self._owner then
+            self._owner._handlers[self] = nil
+        end
+    end
+    connection._owner = self
+    return connection
+end
+
+function Signal:Once(callback)
+    local connection
+    connection = self:Connect(function(...)
+        if connection then connection:Disconnect() end
+        callback(...)
+    end)
+    return connection
+end
+
+function Signal:Fire(...)
+    if self._destroyed then return end
+    for connection, callback in pairs(self._handlers) do
+        if connection.Connected then
+            local ok, err = pcall(callback, ...)
+            if not ok and Library.DebugEnabled then
+                warn("[MistUI Signal] " .. tostring(err))
+            end
+        end
+    end
+end
+
+function Signal:ConnectionCount()
+    local count = 0
+    for connection in pairs(self._handlers) do
+        if connection.Connected then count += 1 end
+    end
+    return count
+end
+
+function Signal:Destroy()
+    self._destroyed = true
+    for connection in pairs(self._handlers) do
+        connection.Connected = false
+        connection._owner = nil
+    end
+    table.clear(self._handlers)
+end
+
+Library.Signal = Signal
+
+Library._flagSignals = Library._flagSignals or {}
+Library.FlagChanged = Library.FlagChanged or Signal.new()
+
+function Library:_GetFlagSignal(flag)
+    flag = self:_NormalizeFlag(flag)
+    if not flag then
+        return nil
+    end
+
+    self._flagSignals[flag] = self._flagSignals[flag] or Signal.new()
+    return self._flagSignals[flag]
+end
+
+function Library:ObserveFlag(flag, callback, fireImmediately)
+    local signalObject = self:_GetFlagSignal(flag)
+    if not signalObject then
+        return { Disconnect = function() end }
+    end
+
+    local connection = signalObject:Connect(callback)
+
+    if fireImmediately == true then
+        Library:SafeCall(callback, self:GetFlag(flag), nil, flag)
+    end
+
+    return connection
+end
+
+local Store = {}
+Store.__index = Store
+
+function Store.new(initial)
+    local self = setmetatable({}, Store)
+    self._values = {}
+    self._signals = {}
+    self.Changed = Signal.new()
+
+    for key, value in pairs(initial or {}) do
+        self._values[key] = value
+    end
+
+    return self
+end
+
+function Store:Get(key)
+    return self._values[key]
+end
+
+function Store:Set(key, value)
+    local previous = self._values[key]
+    if previous == value then
+        return value
+    end
+
+    self._values[key] = value
+    self._signals[key] = self._signals[key] or Signal.new()
+    self._signals[key]:Fire(value, previous, key)
+    self.Changed:Fire(key, value, previous)
+    return value
+end
+
+function Store:Observe(key, callback, fireImmediately)
+    self._signals[key] = self._signals[key] or Signal.new()
+    local connection = self._signals[key]:Connect(callback)
+
+    if fireImmediately == true then
+        callback(self._values[key], nil, key)
+    end
+
+    return connection
+end
+
+function Store:Snapshot()
+    local out = {}
+    for key, value in pairs(self._values) do
+        out[key] = value
+    end
+    return out
+end
+
+function Store:Destroy()
+    for _, signalObject in pairs(self._signals) do
+        signalObject:Destroy()
+    end
+    table.clear(self._signals)
+    self.Changed:Destroy()
+end
+
+Library.Store = Store
+
+local Maid = {}
+Maid.__index = Maid
+
+function Maid.new()
+    return setmetatable({ _tasks = {} }, Maid)
+end
+
+function Maid:Give(taskObject)
+    if taskObject ~= nil then
+        table.insert(self._tasks, taskObject)
+    end
+    return taskObject
+end
+
+function Maid:Cleanup()
+    for i = #self._tasks, 1, -1 do
+        local item = self._tasks[i]
+        self._tasks[i] = nil
+        local kind = typeof(item)
+        if kind == "RBXScriptConnection" then
+            pcall(function() item:Disconnect() end)
+        elseif kind == "Instance" then
+            pcall(function() item:Destroy() end)
+        elseif type(item) == "function" then
+            pcall(item)
+        elseif type(item) == "table" then
+            if type(item.Destroy) == "function" then
+                pcall(function() item:Destroy() end)
+            elseif type(item.Disconnect) == "function" then
+                pcall(function() item:Disconnect() end)
+            elseif type(item.Cleanup) == "function" then
+                pcall(function() item:Cleanup() end)
+            end
+        end
+    end
+end
+
+function Maid:Count()
+    return #self._tasks
+end
+
+function Maid:GetTasks()
+    local out = {}
+    for i, item in ipairs(self._tasks) do out[i] = item end
+    return out
+end
+
+Maid.Destroy = Maid.Cleanup
+Library.Maid = Maid
+
+function Library:_EnsureComponentAPI(component, root)
+    if type(component) ~= "table" then
+        return component
+    end
+
+    root = root or component.Container or component.Instance
+
+    component._events = component._events or {}
+
+    local function event(name)
+        name = tostring(name or "")
+        component._events[name] = component._events[name] or Signal.new()
+        return component._events[name]
+    end
+
+    if type(component.On) ~= "function" then
+        function component:On(name, callback)
+            return event(name):Connect(callback)
+        end
+    end
+
+    if type(component.Emit) ~= "function" then
+        function component:Emit(name, ...)
+            event(name):Fire(...)
+            return self
+        end
+    end
+
+    if type(component.OnChanged) ~= "function" then
+        function component:OnChanged(callback)
+            return self:On("Changed", callback)
+        end
+    end
+
+    if type(component.GetInstance) ~= "function" then
+        function component:GetInstance()
+            return self.Instance
+        end
+    end
+
+    if type(component.GetContainer) ~= "function" then
+        function component:GetContainer()
+            return self.Container or self.Instance
+        end
+    end
+
+    if type(component.IsVisible) ~= "function" then
+        function component:IsVisible()
+            local target = self.Container or self.Instance
+            return not target or not target:IsA("GuiObject") or target.Visible
+        end
+    end
+
+    if type(component.IsDisabled) ~= "function" then
+        function component:IsDisabled()
+            local target = self.Container or self.Instance
+            return target and target:GetAttribute("Disabled") == true or false
+        end
+    end
+
+    if type(component.Show) ~= "function" and type(component.SetVisible) == "function" then
+        function component:Show()
+            return self:SetVisible(true)
+        end
+    end
+
+    if type(component.Hide) ~= "function" and type(component.SetVisible) == "function" then
+        function component:Hide()
+            return self:SetVisible(false)
+        end
+    end
+
+    if type(component.Enable) ~= "function" and type(component.SetDisabled) == "function" then
+        function component:Enable()
+            return self:SetDisabled(false)
+        end
+    end
+
+    if type(component.Disable) ~= "function" and type(component.SetDisabled) == "function" then
+        function component:Disable()
+            return self:SetDisabled(true)
+        end
+    end
+
+    if type(component.GetFlag) ~= "function" then
+        function component:GetFlag()
+            return self.Flag
+        end
+    end
+
+    -- Universal visibility/disabled fallbacks make stateless and passthrough
+    -- components obey the same lifecycle contract as stateful controls.
+    if type(component.SetVisible) ~= "function" and root and root:IsA("GuiObject") then
+        function component:SetVisible(value)
+            root.Visible = value ~= false
+            return self
+        end
+    end
+
+    if type(component.SetDisabled) ~= "function" and root and root:IsA("GuiObject") then
+        function component:SetDisabled(value)
+            local disabled = value == true
+            root:SetAttribute("Disabled", disabled)
+            if root:IsA("GuiButton") then
+                pcall(function() root.Interactable = not disabled end)
+                root.Active = not disabled
+            elseif root:IsA("TextBox") then
+                pcall(function() root.TextEditable = not disabled end)
+                root.Active = not disabled
+            end
+            return self
+        end
+    end
+
+    -- Fallbacks may have been installed above; add the convenience aliases now.
+    if type(component.Show) ~= "function" and type(component.SetVisible) == "function" then
+        function component:Show() return self:SetVisible(true) end
+    end
+    if type(component.Hide) ~= "function" and type(component.SetVisible) == "function" then
+        function component:Hide() return self:SetVisible(false) end
+    end
+    if type(component.Enable) ~= "function" and type(component.SetDisabled) == "function" then
+        function component:Enable() return self:SetDisabled(false) end
+    end
+    if type(component.Disable) ~= "function" and type(component.SetDisabled) == "function" then
+        function component:Disable() return self:SetDisabled(true) end
+    end
+
+    -- Capture a stable default once. Advanced components generally expose
+    -- colon-style methods; legacy controls are normalized by registerNormalControl.
+    if component._mistDefaultCaptured ~= true then
+        component._mistDefaultCaptured = true
+        if component.Default ~= nil then
+            component._mistDefault = componentValueCopy(component.Default)
+        end
+    end
+
+    if type(component.GetDefault) ~= "function" then
+        function component:GetDefault()
+            return componentValueCopy(self._mistDefault ~= nil and self._mistDefault or self.Default)
+        end
+    end
+
+    if type(component.SetDefault) ~= "function" then
+        function component:SetDefault(value)
+            self._mistDefault = componentValueCopy(value)
+            self.Default = componentValueCopy(value)
+            return self
+        end
+    end
+
+    if type(component.Reset) ~= "function" then
+        function component:Reset(fire)
+            local value = self._mistDefault ~= nil and componentValueCopy(self._mistDefault) or componentValueCopy(self.Default)
+            if value == nil then return self end
+            if fire == false and type(self.SetSilent) == "function" then
+                self:SetSilent(value)
+            elseif type(self.Set) == "function" then
+                self:Set(value)
+            elseif type(self.SetValue) == "function" then
+                self:SetValue(value)
+            end
+            return self
+        end
+    end
+
+    if type(component.IsDestroyed) ~= "function" then
+        function component:IsDestroyed()
+            local target = self.Container or self.Instance
+            return self._mistDestroyed == true or (typeof(target) == "Instance" and target.Parent == nil)
+        end
+    end
+
+    if type(component.DestroyEvents) ~= "function" then
+        function component:DestroyEvents()
+            for _, signalObject in pairs(self._events or {}) do
+                if signalObject and type(signalObject.Destroy) == "function" then
+                    signalObject:Destroy()
+                end
+            end
+            table.clear(self._events)
+            return self
+        end
+    end
+
+    return component
+end
+
+function Library:GetVersion()
+    return self.Version
+end
+
+function Library:SetDebugMode(enabled)
+    self.DebugEnabled = enabled == true
+    return self.DebugEnabled
+end
+
+function Library:Debug(...)
+    if self.DebugEnabled then
+        print("[MistUI]", ...)
+    end
+end
+
+function Library:SafeCallContext(context, callback, ...)
+    self.Diagnostics.SafeCalls += 1
+    if type(callback) ~= "function" then
+        local message = "callback is not a function"
+        self:_RecordDiagnostic("Error", message, context)
+        return false, message
+    end
+
+    local results = table.pack(pcall(callback, ...))
+    if not results[1] then
+        local activeWindow = self._activeWindow
+        local enriched = diagnosticCopy(context or {})
+        if activeWindow then
+            enriched.Window = enriched.Window or tostring(activeWindow._title or "MistUI")
+            enriched.Tab = enriched.Tab or (activeWindow._activeTab and activeWindow._activeTab.Name or nil)
+        end
+        local infoOk, source, line, functionName = pcall(function()
+            if debug and type(debug.info) == "function" then
+                return debug.info(3, "sln")
+            end
+            return nil, nil, nil
+        end)
+        if infoOk then
+            enriched.Source = enriched.Source or source
+            enriched.Line = enriched.Line or line
+            enriched.Function = enriched.Function or functionName
+        end
+        self:_RecordDiagnostic("Error", tostring(results[2]), enriched)
+        if self.DebugEnabled then
+            warn("[MistUI Callback] " .. tostring(results[2]))
+        end
+    end
+    return table.unpack(results, 1, results.n)
+end
+
+function Library:SafeCall(callback, ...)
+    return self:SafeCallContext(nil, callback, ...)
+end
+
+function Library:Boundary(context, callback)
+    assert(type(callback) == "function", "Boundary callback must be a function")
+    return function(...)
+        return Library:SafeCallContext(context, callback, ...)
+    end
+end
+
+function Library:SetAnimationsEnabled(enabled)
+    self.AnimationSettings.Enabled = enabled ~= false
+end
+
+function Library:SetAnimationSpeed(multiplier)
+    self.AnimationSettings.Speed = math.max(0.05, tonumber(multiplier) or 1)
+end
+
+function Library:SetReducedMotion(enabled)
+    self.AnimationSettings.ReducedMotion = enabled == true
+end
+
+function Library:RegisterLocale(name, values)
+    name = tostring(name or "")
+    if name == "" or type(values) ~= "table" then return false end
+    self.Locales[name] = values
+    return true
+end
+
+function Library:SetLocale(name)
+    name = tostring(name or "")
+    if not self.Locales[name] then return false end
+    self.Locale = name
+    return true
+end
+
+function Library:T(key, fallback)
+    local locale = self.Locales[self.Locale] or {}
+    local value = locale[key]
+    if value == nil then return fallback ~= nil and fallback or tostring(key) end
+    return value
+end
+
+function Library:CreateMaid()
+    return Maid.new()
+end
+
+function Library:NextZIndex()
+    self._zIndexCounter += 10
+    return self._zIndexCounter
+end
+
+function Library:RegisterConfigMigration(fromVersion, callback)
+    fromVersion = tonumber(fromVersion)
+    if not fromVersion or type(callback) ~= "function" then return false end
+    self.ConfigMigrations[fromVersion] = callback
+    return true
+end
+
+function Library:_RunConfigMigrations(data)
+    if type(data) ~= "table" then return data end
+    local version = tonumber(data.SchemaVersion) or 1
+    local guard = 0
+    while version < (self.SchemaVersion or 5) and guard < 32 do
+        guard += 1
+        local migrate = self.ConfigMigrations[version]
+        if type(migrate) == "function" then
+            local ok, result = pcall(migrate, data)
+            if ok and type(result) == "table" then
+                data = result
+            elseif not ok and self.DebugEnabled then
+                warn("[MistUI Migration] " .. tostring(result))
+            end
+        end
+        version += 1
+        data.SchemaVersion = version
+    end
+    return data
+end
+
+function Library:_NormalizeFlag(flag)
+    if flag == nil then return nil end
+    local clean = tostring(flag)
+    clean = clean:gsub("^%s+", ""):gsub("%s+$", "")
+    if clean == "" then return nil end
+    return clean
+end
+
+function Library:_RegisterFlagComponent(flag, component)
+    flag = self:_NormalizeFlag(flag)
+    if not flag or type(component) ~= "table" then return nil end
+
+    component.Flag = flag
+    local existing = self.ComponentsByFlag[flag]
+    if existing and existing ~= component then
+        self:_RecordDiagnostic("Warning", "Duplicate component flag registered: " .. flag, {
+            Operation = "RegisterFlag", Flag = flag,
+        })
+    end
+    self.ComponentsByFlag[flag] = component
+
+    -- Configs can be loaded before lazy tabs/cards are built.
+    -- Cached config data must therefore override a component's default.
+    if self.Flags[flag] ~= nil then
+        local setter = component.SetConfigValueSilent
+            or component.SetSilent
+            or component.SetValueSilent
+            or component.SetConfigValue
+            or component.Set
+            or component.SetValue
+
+        if type(setter) == "function" then
+            local ok = pcall(setter, self.Flags[flag])
+            if not ok then
+                pcall(setter, component, self.Flags[flag])
+            end
+        end
+        return flag
+    end
+
+    local getter = component.GetConfigValue or component.Get or component.GetValue
+    if type(getter) == "function" then
+        local ok, value = pcall(getter)
+        if not ok then
+            ok, value = pcall(getter, component)
+        end
+        if ok and value ~= nil then
+            self:_UpdateFlagValue(flag, value)
+        end
+    end
+
+    return flag
+end
+
+function Library:_UpdateFlagValue(flag, value)
+    flag = self:_NormalizeFlag(flag)
+    if not flag then return end
+
+    local previous = self.Flags[flag]
+    self.Flags[flag] = value
+
+    if previous ~= value then
+        local signalObject = self:_GetFlagSignal(flag)
+        if signalObject then
+            signalObject:Fire(value, previous, flag)
+        end
+
+        if self.FlagChanged then
+            self.FlagChanged:Fire(flag, value, previous)
+        end
+
+        local activeWindow = self._activeWindow
+        if activeWindow and activeWindow._store then
+            activeWindow._store:Set(flag, value)
+        end
+    end
+end
+
+function Library:GetFlag(flag)
+    flag = self:_NormalizeFlag(flag)
+    return flag and self.Flags[flag] or nil
+end
+
+function Library:GetFlags()
+    local copy = {}
+    for k, v in pairs(self.Flags) do
+        if type(v) == "table" then
+            local sub = {}
+            for sk, sv in pairs(v) do
+                sub[sk] = sv
+            end
+            copy[k] = sub
+        else
+            copy[k] = v
+        end
+    end
+    return copy
+end
+
+function Library:SetFlag(flag, value, silent)
+    flag = self:_NormalizeFlag(flag)
+    if not flag then return false end
+
+    local component = self.ComponentsByFlag[flag]
+    if not component then
+        self:_UpdateFlagValue(flag, value)
+        return false
+    end
+
+    local setter = silent
+        and (component.SetConfigValueSilent or component.SetSilent or component.SetValueSilent or component.SetValue)
+        or (component.SetConfigValue or component.Set or component.SetValue or component.SetSilent)
+
+    if type(setter) == "function" then
+        local ok = pcall(setter, value)
+        if not ok then
+            ok = pcall(setter, component, value)
+        end
+
+        if ok then
+            self:_UpdateFlagValue(flag, value)
+            return true
+        end
+    end
+
+    self:_UpdateFlagValue(flag, value)
+    return false
+end
+
+local function serializeConfigValue(value, seen)
+    seen = seen or {}
+
+    local valueType = typeof(value)
+
+    if value == nil
+        or valueType == "string"
+        or valueType == "number"
+        or valueType == "boolean" then
+        return value
+    end
+
+    if valueType == "Color3" then
+        return {
+            __mist_type = "Color3",
+            r = value.R,
+            g = value.G,
+            b = value.B,
+        }
+    end
+
+    if valueType == "EnumItem" then
+        return {
+            __mist_type = "EnumItem",
+            enum = tostring(value.EnumType),
+            name = value.Name,
+        }
+    end
+
+    if valueType == "Vector2" then
+        return {
+            __mist_type = "Vector2",
+            x = value.X,
+            y = value.Y,
+        }
+    end
+
+    if valueType == "Vector3" then
+        return {
+            __mist_type = "Vector3",
+            x = value.X,
+            y = value.Y,
+            z = value.Z,
+        }
+    end
+
+    if valueType == "UDim" then
+        return {
+            __mist_type = "UDim",
+            scale = value.Scale,
+            offset = value.Offset,
+        }
+    end
+
+    if valueType == "UDim2" then
+        return {
+            __mist_type = "UDim2",
+            xs = value.X.Scale,
+            xo = value.X.Offset,
+            ys = value.Y.Scale,
+            yo = value.Y.Offset,
+        }
+    end
+
+    if valueType == "table" then
+        if seen[value] then
+            return nil
+        end
+        seen[value] = true
+
+        local output = {}
+        for k, v in pairs(value) do
+            local key = type(k) == "string" and k or tostring(k)
+            local serialized = serializeConfigValue(v, seen)
+            if serialized ~= nil then
+                output[key] = serialized
+            end
+        end
+
+        seen[value] = nil
+        return output
+    end
+
+    -- Skip Instances, functions, userdata and unsupported Roblox types
+    -- instead of making JSONEncode fail for the entire config.
+    return nil
+end
+
+local function deserializeConfigValue(value)
+    if type(value) ~= "table" then
+        return value
+    end
+
+    local marker = value.__mist_type
+
+    if marker == "Color3" then
+        return Color3.new(
+            tonumber(value.r) or 0,
+            tonumber(value.g) or 0,
+            tonumber(value.b) or 0
+        )
+    end
+
+    if marker == "EnumItem" then
+        local enumName = tostring(value.enum or ""):match("^Enum%.(.+)$")
+        if enumName and Enum[enumName] and value.name and Enum[enumName][value.name] then
+            return Enum[enumName][value.name]
+        end
+        return nil
+    end
+
+    if marker == "Vector2" then
+        return Vector2.new(tonumber(value.x) or 0, tonumber(value.y) or 0)
+    end
+
+    if marker == "Vector3" then
+        return Vector3.new(
+            tonumber(value.x) or 0,
+            tonumber(value.y) or 0,
+            tonumber(value.z) or 0
+        )
+    end
+
+    if marker == "UDim" then
+        return UDim.new(tonumber(value.scale) or 0, tonumber(value.offset) or 0)
+    end
+
+    if marker == "UDim2" then
+        return UDim2.new(
+            tonumber(value.xs) or 0,
+            tonumber(value.xo) or 0,
+            tonumber(value.ys) or 0,
+            tonumber(value.yo) or 0
+        )
+    end
+
+    local output = {}
+    for k, v in pairs(value) do
+        if k ~= "__mist_type" then
+            output[k] = deserializeConfigValue(v)
+        end
+    end
+    return output
+end
+
+function Library:_CollectFlagValues()
+    local data = {}
+
+    -- Include every value written through _UpdateFlagValue too.
+    for flag, value in pairs(self.Flags) do
+        local serialized = serializeConfigValue(value)
+        if serialized ~= nil then
+            data[flag] = serialized
+        end
+    end
+
+    -- Registered components override the cached value with their live value.
+    for flag, component in pairs(self.ComponentsByFlag) do
+        local getter = component.GetConfigValue or component.Get or component.GetValue
+        if type(getter) == "function" then
+            local ok, value = pcall(getter, component)
+            if ok then
+                local serialized = serializeConfigValue(value)
+                if serialized ~= nil then
+                    data[flag] = serialized
+                end
+            end
+        end
+    end
+
+    return data
+end
+
+function Library:_ApplyFlagValues(payload)
+    if type(payload) ~= "table" then return false end
+
+    for flag, value in pairs(payload) do
+        local restored = deserializeConfigValue(value)
+        self:SetFlag(flag, restored, true)
+    end
+
+    return true
+end
+
+Library:RegisterConfigMigration(3, function(data)
+    data.Interface = data.Interface or {}
+
+    if data.Interface.FunctionInfo == nil then
+        data.Interface.FunctionInfo = true
+    end
+
+    data.SchemaVersion = 4
+    return data
+end)
+
+Library:RegisterConfigMigration(4, function(data)
+    data.Interface = data.Interface or {}
+    data.Notifications = data.Notifications or {}
+    if data.Notifications.PauseOnHover == nil then
+        data.Notifications.PauseOnHover = true
+    end
+    if data.Interface.ReducedMotion == nil then data.Interface.ReducedMotion = false end
+    if data.Interface.AnimationSpeed == nil then data.Interface.AnimationSpeed = 1 end
+    if data.Interface.Responsive == nil then data.Interface.Responsive = true end
+    data.SchemaVersion = 5
+    return data
+end)
+
+------------------------------------------------------------
+-- HELPERS
+------------------------------------------------------------
+local function create(class, props, children)
+    local inst = Instance.new(class)
+    -- Remove a borda azul padrão do Roblox (BorderSizePixel=1 / BorderColor3
+    -- azulado) de QUALQUER GuiObject, antes de aplicar as props do usuário
+    -- (assim, se alguém passar BorderSizePixel explicitamente, ainda funciona).
+    if inst:IsA("GuiObject") then
+        inst.BorderSizePixel = 0
+    end
+
+    -- Parent is applied LAST. This guarantees properties such as Selectable=false
+    -- are already in place before ScreenGui.DescendantAdded sees the instance.
+    -- Without this, focus preparation could attach a selection stroke before the
+    -- component had finished applying its intended non-selectable state.
+    local requestedParent = props and props.Parent or nil
+    for prop, value in pairs(props or {}) do
+        if prop ~= "Parent" then
+            inst[prop] = value
+
+            if typeof(value) == "Color3" then
+                local token, factor = Library:_ThemeBindingForColor(value, Theme)
+                if token then
+                    Library:BindTheme(
+                        inst,
+                        prop,
+                        token,
+                        factor and function(color)
+                            return Library:_ThemeShade(color, factor)
+                        end or nil
+                    )
+                end
+            end
+        end
+    end
+
+    for _, child in ipairs(children or {}) do
+        if child then
+            child.Parent = inst
+        end
+    end
+    if requestedParent then
+        inst.Parent = requestedParent
+    end
+    return inst
+end
+
+local function corner(radius)
+    return create("UICorner", { CornerRadius = UDim.new(0, radius or 8) })
+end
+
+local function stroke(color, thickness, transparency)
+    return create("UIStroke", {
+        Color = color or Theme.Stroke,
+        Thickness = thickness or 1,
+        Transparency = transparency or 0,
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+    })
+end
+
+local function padding(all, l, t, r, b)
+    return create("UIPadding", {
+        PaddingLeft   = UDim.new(0, l or all or 0),
+        PaddingTop    = UDim.new(0, t or all or 0),
+        PaddingRight  = UDim.new(0, r or all or 0),
+        PaddingBottom = UDim.new(0, b or all or 0),
+    })
+end
+
+local function tween(inst, props, time, style, dir)
+    local settings = Library.AnimationSettings or {}
+    local duration = time or 0.18
+
+    for property, value in pairs(props or {}) do
+        if typeof(value) == "Color3" then
+            local token, factor = Library:_ThemeBindingForColor(value, Theme)
+            if token then
+                Library:BindTheme(
+                    inst,
+                    property,
+                    token,
+                    factor and function(color)
+                        return Library:_ThemeShade(color, factor)
+                    end or nil
+                )
+            else
+                Library:UnbindTheme(inst, property)
+            end
+        end
+    end
+
+    if settings.Enabled == false or settings.ReducedMotion == true then
+        duration = 0
+    else
+        duration = duration / math.max(0.05, tonumber(settings.Speed) or 1)
+    end
+
+    local info = TweenInfo.new(
+        duration,
+        style or Enum.EasingStyle.Quint,
+        dir or Enum.EasingDirection.Out
+    )
+    local t = TweenService:Create(inst, info, props)
+    t:Play()
+    return t
+end
+
+-- Shared motion values come from the design system.
+local MOTION = Theme.Motion
+
+local function smoothTween(inst, props, duration, style, direction)
+    return tween(
+        inst,
+        props,
+        duration or MOTION.Normal,
+        style or Enum.EasingStyle.Quint,
+        direction or Enum.EasingDirection.Out
+    )
+end
+
+local DragController = {}
+DragController.__index = DragController
+
+function DragController.new(maid)
+    local self = setmetatable({}, DragController)
+    self._maid = maid
+    self._active = nil
+
+    self._maid:Give(UserInputService.InputChanged:Connect(function(input)
+        local active = self._active
+        if not active
+            or input ~= active.Input
+            or active.Target:GetAttribute("DragLocked") == true then
+            return
+        end
+
+        local delta = input.Position - active.StartInput
+        local startPos = active.StartPosition
+
+        active.Target.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end))
+
+    return self
+end
+
+function DragController:Attach(handle, target)
+    local candidateInput = nil
+
+    self._maid:Give(handle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch then
+            candidateInput = input
+        end
+    end))
+
+    self._maid:Give(handle.InputBegan:Connect(function(input)
+        if target:GetAttribute("DragLocked") == true then
+            return
+        end
+
+        if input.UserInputType ~= Enum.UserInputType.MouseButton1
+            and input.UserInputType ~= Enum.UserInputType.Touch then
+            return
+        end
+
+        local activeInput = candidateInput or input
+
+        self._active = {
+            Target = target,
+            Input = activeInput,
+            StartInput = input.Position,
+            StartPosition = target.Position,
+        }
+
+        local endConnection
+        endConnection = input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                if self._active and self._active.Target == target then
+                    self._active = nil
+                end
+
+                if endConnection then
+                    endConnection:Disconnect()
+                end
+            end
+        end)
+
+        self._maid:Give(endConnection)
+    end))
+
+    return target
+end
+
+function DragController:Destroy()
+    self._active = nil
+end
+
+local function getGuiParent()
+    local ok, hui = pcall(function() return gethui and gethui() or CoreGui end)
+    if ok and hui then return hui end
+    return LocalPlayer:WaitForChild("PlayerGui")
+end
+
+------------------------------------------------------------
+-- ÍCONES: Lucide real via lucide-roblox (latte-soft), com
+-- fallback vetorial DESENHADO (não uma bolinha genérica) caso
+-- o HttpGet falhe (executor sem rede / domínio bloqueado).
+-- https://github.com/latte-soft/lucide-roblox
+------------------------------------------------------------
+Library.UseRemoteIcons = Library.UseRemoteIcons == true
+Library.RemoteIconUrls = Library.RemoteIconUrls or {
+    "https://github.com/latte-soft/lucide-roblox/releases/latest/download/lucide-roblox.luau",
+    "https://raw.githubusercontent.com/latte-soft/lucide-roblox/master/lucide-roblox.luau",
+}
+
+local Lucide
+
+function Library:LoadRemoteIcons()
+    if Lucide then return true end
+    for _, url in ipairs(self.RemoteIconUrls or {}) do
+        local ok, result = pcall(function()
+            return loadstring(game:HttpGet(url))()
+        end)
+        if ok and result then
+            Lucide = result
+            self.UseRemoteIcons = true
+            return true
+        end
+    end
+    return false
+end
+
+function Library:SetRemoteIconsEnabled(enabled)
+    self.UseRemoteIcons = enabled == true
+    if self.UseRemoteIcons then
+        return self:LoadRemoteIcons()
+    end
+    return true
+end
+
+if Library.UseRemoteIcons then
+    Library:LoadRemoteIcons()
+end
+
+------------------------------------------------------------
+-- FALLBACK VETORIAL (usado só se o Lucide não carregar).
+-- Desenhado à mão, fino, consistente com o resto da UI — nada
+-- de bolinha genérica.
+------------------------------------------------------------
+local function rect(container, size, pos, cornerRadius, anchor)
+    return create("Frame", {
+        BackgroundColor3 = Color3.new(1, 1, 1),
+        AnchorPoint = anchor or Vector2.new(0.5, 0.5),
+        Position = pos, Size = size, ZIndex = 6, Parent = container,
+    }, { corner(cornerRadius or 1) })
+end
+
+local FALLBACK_ICONS = {}
+
+FALLBACK_ICONS["x"] = function(container, s, color)
+    local a = rect(container, UDim2.new(0, s * 0.7, 0, 1.4), UDim2.new(0.5, 0, 0.5, 0), 1); a.Rotation = 45
+    local b = rect(container, UDim2.new(0, s * 0.7, 0, 1.4), UDim2.new(0.5, 0, 0.5, 0), 1); b.Rotation = -45
+    a.BackgroundColor3 = color; b.BackgroundColor3 = color
+    return { a, b }
+end
+
+FALLBACK_ICONS["search"] = function(container, s, color)
+    local ring = create("Frame", {
+        BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.42, 0, 0.42, 0), Size = UDim2.new(0, s * 0.55, 0, s * 0.55),
+        ZIndex = 6, Parent = container,
+    }, { corner(9999), stroke(color, 1.4, 0) })
+    local handle = rect(container, UDim2.new(0, s * 0.32, 0, 1.4), UDim2.new(0.76, 0, 0.76, 0), 1)
+    handle.Rotation = 45
+    handle.BackgroundColor3 = color
+    return { ring, handle }
+end
+
+FALLBACK_ICONS["chevron-right"] = function(container, s, color)
+    local a = rect(container, UDim2.new(0, s * 0.13, 0, s * 0.42), UDim2.new(0.5, -s * 0.06, 0.5, -s * 0.16), 1)
+    a.Rotation = 28
+    local b = rect(container, UDim2.new(0, s * 0.13, 0, s * 0.42), UDim2.new(0.5, -s * 0.06, 0.5, s * 0.16), 1)
+    b.Rotation = -28
+    a.BackgroundColor3 = color; b.BackgroundColor3 = color
+    return { a, b }
+end
+
+FALLBACK_ICONS["chevron-left"] = function(container, s, color)
+    local parts = FALLBACK_ICONS["chevron-right"](container, s, color)
+    for _, p in ipairs(parts) do p.Rotation = -p.Rotation end
+    return parts
+end
+
+
+FALLBACK_ICONS["minus"] = function(container, s, color)
+    local line = rect(container, UDim2.new(0, s * 0.62, 0, 1.6), UDim2.new(0.5, 0, 0.5, 0), 1)
+    line.BackgroundColor3 = color
+    return { line }
+end
+
+FALLBACK_ICONS["plus"] = function(container, s, color)
+    local h = rect(container, UDim2.new(0, s * 0.62, 0, 1.6), UDim2.new(0.5, 0, 0.5, 0), 1)
+    local v = rect(container, UDim2.new(0, 1.6, 0, s * 0.62), UDim2.new(0.5, 0, 0.5, 0), 1)
+    h.BackgroundColor3 = color
+    v.BackgroundColor3 = color
+    return { h, v }
+end
+
+FALLBACK_ICONS["check"] = function(container, s, color)
+    local a = rect(container, UDim2.new(0, s * 0.30, 0, 1.7), UDim2.new(0.42, -s * 0.08, 0.56, 0), 1)
+    a.Rotation = 45
+    local b = rect(container, UDim2.new(0, s * 0.52, 0, 1.7), UDim2.new(0.56, s * 0.03, 0.49, 0), 1)
+    b.Rotation = -45
+    a.BackgroundColor3 = color
+    b.BackgroundColor3 = color
+    return { a, b }
+end
+
+FALLBACK_ICONS["file"] = function(container, s, color)
+    local outer = create("Frame", {
+        BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(0, s * 0.62, 0, s * 0.8),
+        ZIndex = 6, Parent = container,
+    }, { corner(2), stroke(color, 1.2, 0) })
+    local line1 = rect(outer, UDim2.new(0, s * 0.34, 0, 1.2), UDim2.new(0.5, 0, 0.42, 0), 1)
+    local line2 = rect(outer, UDim2.new(0, s * 0.34, 0, 1.2), UDim2.new(0.5, 0, 0.62, 0), 1)
+    line1.BackgroundColor3 = color; line2.BackgroundColor3 = color
+    return { outer, line1, line2 }
+end
+
+FALLBACK_ICONS["star"] = function(container, s, color)
+    local a = rect(container, UDim2.new(0, s * 0.62, 0, s * 0.62), UDim2.new(0.5, 0, 0.5, 0), 2)
+    local b = rect(container, UDim2.new(0, s * 0.62, 0, s * 0.62), UDim2.new(0.5, 0, 0.5, 0), 2); b.Rotation = 45
+    a.BackgroundColor3 = color; b.BackgroundColor3 = color
+    return { a, b }
+end
+
+-- Engrenagem simplificada: anel + núcleo (usada pelo botão de Settings,
+-- que antes caía no traço genérico por não ter desenho próprio).
+FALLBACK_ICONS["settings"] = function(container, s, color)
+    local ring = create("Frame", {
+        BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(0, s * 0.64, 0, s * 0.64),
+        ZIndex = 6, Parent = container,
+    }, { corner(9999), stroke(color, 1.4, 0) })
+    local coreDot = rect(container, UDim2.new(0, s * 0.2, 0, s * 0.2), UDim2.new(0.5, 0, 0.5, 0), 9999)
+    coreDot.BackgroundColor3 = color
+    local teeth = {}
+    for i = 0, 3 do
+        local tooth = rect(container, UDim2.new(0, s * 0.14, 0, s * 0.86), UDim2.new(0.5, 0, 0.5, 0), 1)
+        tooth.Rotation = i * 45
+        tooth.BackgroundColor3 = color
+        tooth.ZIndex = 5
+        table.insert(teeth, tooth)
+    end
+    ring.ZIndex = 6
+    coreDot.ZIndex = 7
+    return { ring, coreDot, teeth[1], teeth[2], teeth[3], teeth[4] }
+end
+
+-- User/profile icon fallback.
+FALLBACK_ICONS["user"] = function(container, s, color)
+    local parts = {}
+    local head = create("Frame", {
+        BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.32, 0), Size = UDim2.new(0, s * 0.34, 0, s * 0.34),
+        ZIndex = 6, Parent = container,
+    }, { corner(9999), stroke(color, 1.35, 0) })
+    local shoulders = create("Frame", {
+        BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.73, 0), Size = UDim2.new(0, s * 0.72, 0, s * 0.38),
+        ZIndex = 6, Parent = container,
+    }, { corner(9999), stroke(color, 1.35, 0) })
+    table.insert(parts, head)
+    table.insert(parts, shoulders)
+    return parts
+end
+
+-- Eye icon fallback.
+FALLBACK_ICONS["eye"] = function(container, s, color)
+    local outer = create("Frame", {
+        BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(0, s * 0.86, 0, s * 0.5),
+        ZIndex = 6, Parent = container,
+    }, { corner(9999), stroke(color, 1.3, 0) })
+    local pupil = rect(container, UDim2.new(0, s * 0.22, 0, s * 0.22), UDim2.new(0.5, 0, 0.5, 0), 9999)
+    pupil.BackgroundColor3 = color
+    return { outer, pupil }
+end
+
+-- Quadrado vazado: usado no Box (visual).
+FALLBACK_ICONS["square"] = function(container, s, color)
+    local outline = create("Frame", {
+        BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(0, s * 0.6, 0, s * 0.6),
+        ZIndex = 6, Parent = container,
+    }, { corner(3), stroke(color, 1.4, 0) })
+    return { outline }
+end
+
+-- Régua: usada em Distance.
+FALLBACK_ICONS["ruler"] = function(container, s, color)
+    local body_ = rect(container, UDim2.new(0, s * 0.86, 0, s * 0.32), UDim2.new(0.5, 0, 0.5, 0), 2)
+    body_.Rotation = -35
+    body_.BackgroundColor3 = color
+    body_.ZIndex = 6
+    return { body_ }
+end
+
+-- Gema (diamante): usada em farms de item.
+FALLBACK_ICONS["gem"] = function(container, s, color)
+    local d = rect(container, UDim2.new(0, s * 0.5, 0, s * 0.5), UDim2.new(0.5, 0, 0.5, 0), 2)
+    d.Rotation = 45
+    d.BackgroundColor3 = color
+    return { d }
+end
+
+-- Cifrão ($): usado em farms de moeda. Desenhado como texto porque
+-- reproduzir um "$" com retângulos/anéis fica irreconhecível.
+FALLBACK_ICONS["dollar"] = function(container, s, color)
+    local label = create("TextLabel", {
+        Text = "$", FontFace = Theme.FontBold, TextSize = math.floor(s * 0.9),
+        TextColor3 = color, BackgroundTransparency = 1,
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0),
+        Size = UDim2.new(1, 0, 1, 0), TextXAlignment = Enum.TextXAlignment.Center,
+        TextYAlignment = Enum.TextYAlignment.Center, ZIndex = 6, Parent = container,
+    })
+    return { label }
+end
+
+-- Crossed-swords fallback icon.
+FALLBACK_ICONS["swords"] = function(container, s, color)
+    local a = rect(container, UDim2.new(0, s * 0.85, 0, s * 0.15), UDim2.new(0.5, 0, 0.5, 0), 2)
+    a.Rotation = 45
+    local b = rect(container, UDim2.new(0, s * 0.85, 0, s * 0.15), UDim2.new(0.5, 0, 0.5, 0), 2)
+    b.Rotation = -45
+    a.BackgroundColor3 = color; b.BackgroundColor3 = color
+    return { a, b }
+end
+
+-- Shield icon fallback used by Activity detector sections.
+FALLBACK_ICONS["shield"] = function(container, s, color)
+    local body = create("Frame", {
+        BackgroundTransparency = 1,
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        Size = UDim2.new(0, s * 0.68, 0, s * 0.78),
+        Rotation = 0,
+        ZIndex = 6,
+        Parent = container,
+    }, { corner(4), stroke(color, 1.35, 0) })
+    local bottom = rect(container, UDim2.new(0, s * 0.38, 0, s * 0.10), UDim2.new(0.5, 0, 0.80, 0), 2)
+    bottom.Rotation = 45
+    bottom.BackgroundColor3 = color
+    bottom.ZIndex = 7
+    return { body, bottom }
+end
+
+-- Teclado: usado no menu flutuante de Keybinds.
+FALLBACK_ICONS["keyboard"] = function(container, s, color)
+    local body_ = create("Frame", {
+        BackgroundTransparency = 1,
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        Size = UDim2.new(0, s * 0.88, 0, s * 0.62),
+        ZIndex = 6,
+        Parent = container,
+    }, { corner(3) })
+
+    local outline = stroke(color, 1.25, 0)
+    outline.Parent = body_
+
+    local parts = { outline }
+
+    local keyW = s * 0.12
+    local keyH = s * 0.10
+    local startX = 0.20
+
+    for row = 0, 1 do
+        for col = 0, 3 do
+            local key = rect(
+                body_,
+                UDim2.new(0, keyW, 0, keyH),
+                UDim2.new(startX + col * 0.20, 0, 0.30 + row * 0.24, 0),
+                1
+            )
+            key.BackgroundColor3 = color
+            table.insert(parts, key)
+        end
+    end
+
+    local space = rect(
+        body_,
+        UDim2.new(0, s * 0.40, 0, keyH),
+        UDim2.new(0.5, 0, 0.78, 0),
+        1
+    )
+    space.BackgroundColor3 = color
+    table.insert(parts, space)
+
+    return parts
+end
+
+-- Info em círculo: usado pelo Function Info.
+FALLBACK_ICONS["info"] = function(container, s, color)
+    local ring = create("Frame", {
+        BackgroundTransparency = 1,
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        Size = UDim2.new(0, s * 0.82, 0, s * 0.82),
+        ZIndex = 6,
+        Parent = container,
+    }, { corner(9999), stroke(color, 1.35, 0) })
+
+    local stem = rect(
+        container,
+        UDim2.new(0, 1.5, 0, s * 0.28),
+        UDim2.new(0.5, 0, 0.58, 0),
+        1
+    )
+    stem.BackgroundColor3 = color
+    stem.ZIndex = 7
+
+    local dot = rect(
+        container,
+        UDim2.new(0, s * 0.10, 0, s * 0.10),
+        UDim2.new(0.5, 0, 0.31, 0),
+        9999
+    )
+    dot.BackgroundColor3 = color
+    dot.ZIndex = 7
+
+    return { ring, stem, dot }
+end
+
+-- Map-pin icon fallback.
+FALLBACK_ICONS["triangle-alert"] = function(container, s, color)
+    local parts = {}
+    local left = rect(container, UDim2.new(0, s * 0.62, 0, 1.5), UDim2.new(0.38, 0, 0.48, 0), 1)
+    left.Rotation = -58
+    left.BackgroundColor3 = color
+    table.insert(parts, left)
+
+    local right = rect(container, UDim2.new(0, s * 0.62, 0, 1.5), UDim2.new(0.62, 0, 0.48, 0), 1)
+    right.Rotation = 58
+    right.BackgroundColor3 = color
+    table.insert(parts, right)
+
+    local base = rect(container, UDim2.new(0, s * 0.64, 0, 1.5), UDim2.new(0.5, 0, 0.76, 0), 1)
+    base.BackgroundColor3 = color
+    table.insert(parts, base)
+
+    local stem = rect(container, UDim2.new(0, 1.6, 0, s * 0.20), UDim2.new(0.5, 0, 0.48, 0), 1)
+    stem.BackgroundColor3 = color
+    table.insert(parts, stem)
+
+    local dot = rect(container, UDim2.new(0, 2.2, 0, 2.2), UDim2.new(0.5, 0, 0.64, 0), 2)
+    dot.BackgroundColor3 = color
+    table.insert(parts, dot)
+    return parts
+end
+
+FALLBACK_ICONS["map-pin"] = function(container, s, color)
+    local head = create("Frame", {
+        BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.38, 0), Size = UDim2.new(0, s * 0.6, 0, s * 0.6),
+        ZIndex = 6, Parent = container,
+    }, { corner(9999), stroke(color, 1.4, 0) })
+    local dot = rect(container, UDim2.new(0, s * 0.16, 0, s * 0.16), UDim2.new(0.5, 0, 0.38, 0), 9999)
+    dot.BackgroundColor3 = color
+    local tip = rect(container, UDim2.new(0, s * 0.3, 0, s * 0.3), UDim2.new(0.5, 0, 0.78, 0), 2)
+    tip.Rotation = 45
+    tip.BackgroundColor3 = color
+    return { head, dot, tip }
+end
+
+-- Globo: usado em World.
+FALLBACK_ICONS["globe"] = function(container, s, color)
+    local outerRing = create("Frame", {
+        BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(0, s * 0.86, 0, s * 0.86),
+        ZIndex = 6, Parent = container,
+    }, { corner(9999), stroke(color, 1.4, 0) })
+    local equator = rect(container, UDim2.new(0, s * 0.86, 0, 1.2), UDim2.new(0.5, 0, 0.5, 0), 1)
+    equator.BackgroundColor3 = color
+    local meridian = create("Frame", {
+        BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(0, s * 0.3, 0, s * 0.86),
+        ZIndex = 6, Parent = container,
+    }, { corner(9999), stroke(color, 1.2, 0) })
+    return { outerRing, equator, meridian }
+end
+
+-- Três pontos horizontais: usado em Misc.
+FALLBACK_ICONS["more-horizontal"] = function(container, s, color)
+    local dots = {}
+    for i = -1, 1 do
+        local dot = rect(container, UDim2.new(0, s * 0.16, 0, s * 0.16), UDim2.new(0.5, i * s * 0.3, 0.5, 0), 9999)
+        dot.BackgroundColor3 = color
+        table.insert(dots, dot)
+    end
+    return dots
+end
+
+FALLBACK_ICONS["circle"] = FALLBACK_ICONS["circle"] or function(container, s, color)
+    local ring = create("Frame", {
+        BackgroundTransparency = 1,
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        Size = UDim2.new(0, s * 0.72, 0, s * 0.72),
+        Parent = container,
+    }, { corner(9999), stroke(color, math.max(1, s * 0.10), 0) })
+    return { ring }
+end
+
+FALLBACK_ICONS["refresh-cw"] = FALLBACK_ICONS["refresh-cw"] or function(container, s, color)
+    local parts = {}
+    local top = create("Frame", {
+        BackgroundColor3 = color,
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.36, 0),
+        Size = UDim2.new(0, s * 0.62, 0, math.max(1, s * 0.10)),
+        Rotation = -18,
+        Parent = container,
+    }, { corner(2) })
+    local bottom = create("Frame", {
+        BackgroundColor3 = color,
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.64, 0),
+        Size = UDim2.new(0, s * 0.62, 0, math.max(1, s * 0.10)),
+        Rotation = -18,
+        Parent = container,
+    }, { corner(2) })
+    local a1 = create("TextLabel", {
+        Text = "›", FontFace = Theme.FontBold, TextSize = math.floor(s * 0.72),
+        TextColor3 = color, BackgroundTransparency = 1,
+        Position = UDim2.new(0.56, 0, -0.02, 0), Size = UDim2.new(0.4, 0, 0.55, 0),
+        Rotation = -18, Parent = container,
+    })
+    local a2 = create("TextLabel", {
+        Text = "‹", FontFace = Theme.FontBold, TextSize = math.floor(s * 0.72),
+        TextColor3 = color, BackgroundTransparency = 1,
+        Position = UDim2.new(0.04, 0, 0.48, 0), Size = UDim2.new(0.4, 0, 0.55, 0),
+        Rotation = -18, Parent = container,
+    })
+    table.insert(parts, top); table.insert(parts, bottom); table.insert(parts, a1); table.insert(parts, a2)
+    return parts
+end
+
+local function fallbackIcon(iconName, container, s, color)
+    local factory = FALLBACK_ICONS[iconName]
+    if factory then return factory(container, s, color) end
+    -- nome sem desenho próprio: um traço neutro (nunca uma bola cheia)
+    local a = rect(container, UDim2.new(0, s * 0.5, 0, 1.4), UDim2.new(0.5, 0, 0.5, 0), 1)
+    a.BackgroundColor3 = color
+    return { a }
+end
+
+-- Cria o ícone `iconName` dentro de `container`. Retorna a instância
+-- (ImageLabel se veio do Lucide, ou uma tabela de Frames se foi o
+-- fallback vetorial) — use setIconColor() pra trocar a cor depois.
+local function buildIcon(container, iconName, size, color)
+    if Lucide then
+        local ok, asset = pcall(function() return Lucide.GetAsset(iconName, math.max(16, math.floor(size))) end)
+        if ok and asset then
+            local img = create("ImageLabel", {
+                Image = asset.Url or ("rbxassetid://" .. tostring(asset.Id)),
+                ImageRectOffset = asset.ImageRectOffset,
+                ImageRectSize = asset.ImageRectSize,
+                BackgroundTransparency = 1,
+                ImageColor3 = color,
+                Size = UDim2.new(0, size, 0, size),
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                Position = UDim2.new(0.5, 0, 0.5, 0),
+                ZIndex = 6,
+                Parent = container,
+            })
+            return img
+        end
+    end
+    return fallbackIcon(iconName, container, size, color)
+end
+
+-- Helper pra mudar a cor de um ícone (funciona tanto pra ImageLabel do
+-- Lucide quanto pra tabela de Frames do fallback vetorial).
+local function setIconColor(iconInst, color, time)
+    if not iconInst then return end
+    if typeof(iconInst) == "table" then
+        for _, inst in ipairs(iconInst) do
+            if inst:IsA("TextLabel") or inst:IsA("TextButton") then
+                tween(inst, { TextColor3 = color }, time or 0.15)
+            elseif inst:IsA("Frame") then
+                tween(inst, { BackgroundColor3 = color }, time or 0.15)
+            else
+                tween(inst, { Color = color }, time or 0.15) -- UIStroke
+            end
+        end
+        return
+    end
+    if iconInst:IsA("ImageLabel") then
+        tween(iconInst, { ImageColor3 = color }, time or 0.15)
+    else
+        tween(iconInst, { BackgroundColor3 = color }, time or 0.15)
+    end
+end
+
+------------------------------------------------------------
+-- BOTÃO GENÉRICO
+------------------------------------------------------------
+local function getButtonVariant(variant)
+    variant = variant or "secondary"
+
+    -- Visual unification:
+    -- all buttons use the same dark surface style so Settings
+    -- no longer mixes dark buttons with bright/white ones.
+    if variant == "danger" then
+        return Theme.TitleBar, Theme.Text
+    elseif variant == "ghost" then
+        return Theme.TitleBar, Theme.Text
+    elseif variant == "primary" then
+        return Theme.TitleBar, Theme.Text
+    end
+
+    return Theme.TitleBar, Theme.Text
+end
+
+local function shadeColor(color, factor)
+    return Color3.new(
+        math.clamp(color.R * factor, 0, 1),
+        math.clamp(color.G * factor, 0, 1),
+        math.clamp(color.B * factor, 0, 1)
+    )
+end
+
+local function makeButton(parent, text, variant, w, h, callback)
+    callback = callback or function() end
+    variant = variant or "secondary"
+
+    local baseBg, baseText = getButtonVariant(variant)
+    local height = h or 34
+
+    local btn = create("TextButton", {
+        Text = "",
+        AutoButtonColor = false,
+        BorderSizePixel = 0,
+        BackgroundColor3 = baseBg,
+        BackgroundTransparency = 0,
+        Size = UDim2.new(w and 0 or 1, w or 0, 0, height),
+        ZIndex = 3,
+        Parent = parent,
+    }, { corner(12) })
+
+    local label = create("TextLabel", {
+        Text = text,
+        FontFace = Theme.FontSemibold,
+        TextSize = 13,
+        TextColor3 = baseText,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 12, 0, 0),
+        Size = UDim2.new(1, -24, 1, 0),
+        TextXAlignment = Enum.TextXAlignment.Center,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+        ZIndex = 4,
+        Parent = btn,
+    })
+
+    btn:SetAttribute("MistButtonVariant", variant)
+
+    local buttonScale = create("UIScale", {
+        Scale = 1,
+        Parent = btn,
+    })
+
+    btn.MouseEnter:Connect(function()
+        local bg, fg = getButtonVariant(variant)
+        smoothTween(label, { TextColor3 = fg }, MOTION.Fast)
+        smoothTween(btn, { BackgroundColor3 = shadeColor(bg, 1.045) }, MOTION.Normal)
+        smoothTween(buttonScale, { Scale = 1.012 }, MOTION.Normal)
+    end)
+
+    btn.MouseLeave:Connect(function()
+        local bg, fg = getButtonVariant(variant)
+        smoothTween(label, { TextColor3 = fg }, MOTION.Fast)
+        smoothTween(btn, { BackgroundColor3 = bg }, MOTION.Normal)
+        smoothTween(buttonScale, { Scale = 1 }, MOTION.Normal)
+    end)
+
+    btn.MouseButton1Down:Connect(function()
+        local bg = select(1, getButtonVariant(variant))
+        smoothTween(btn, { BackgroundColor3 = shadeColor(bg, 0.93) }, MOTION.Fast)
+        smoothTween(buttonScale, { Scale = 0.985 }, MOTION.Fast)
+    end)
+
+    btn.MouseButton1Up:Connect(function()
+        local bg = select(1, getButtonVariant(variant))
+        smoothTween(btn, { BackgroundColor3 = shadeColor(bg, 1.045) }, MOTION.Fast)
+        smoothTween(buttonScale, { Scale = 1.012 }, MOTION.Fast)
+    end)
+
+    btn.MouseButton1Click:Connect(function()
+        Library:SafeCall(callback)
+    end)
+    return btn
+end
+

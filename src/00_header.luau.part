@@ -1,0 +1,39 @@
+--!nocheck
+--[[
+    ============================================================
+    MIST UI LIBRARY v4.0 STABLE
+    Executor-ready single-file distribution.
+    ============================================================
+
+    Recommended modern API:
+
+        local Library = loadstring(game:HttpGet("RAW_URL"))()
+        local Window = Library:CreateWindow({ Title = "MY HUB" })
+        local Main = Window:CreateCategory("Main")
+
+        Main:AddScript("Example", function(page)
+            local row = page:CreateRow()
+            local card = row:AddCard("Example")
+
+            local toggle = card:Add("Toggle", {
+                Id = "example.enabled",
+                Text = "Enabled",
+                Default = false,
+                Callback = function(value) end,
+            })
+        end)
+
+    Legacy card:AddToggle/AddSlider/etc. methods remain available for
+    compatibility. Card:Add(type, config) is the recommended stable API.
+
+    Distribution policy:
+      - one active Window per Library instance by design
+      - load the raw file again if an independent second UI is required
+      - executor-specific storage is isolated behind StorageAdapter
+      - remote icon code is opt-in; internal icons always have local fallbacks
+
+    Development type declarations, tests and documentation are shipped in the
+    GitHub source package and are intentionally not embedded in this raw file.
+    ============================================================
+]]
+

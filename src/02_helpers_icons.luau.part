@@ -1,0 +1,408 @@
+------------------------------------------------------------
+-- SHARED UI HELPERS
+------------------------------------------------------------
+local function colorToHex(color)
+    local r = math.clamp(math.floor(color.R * 255 + 0.5), 0, 255)
+    local g = math.clamp(math.floor(color.G * 255 + 0.5), 0, 255)
+    local b = math.clamp(math.floor(color.B * 255 + 0.5), 0, 255)
+    return string.format("#%02X%02X%02X", r, g, b)
+end
+
+local function parseHex(value)
+    if type(value) ~= "string" then return nil end
+    local hex = value:gsub("%s+", ""):gsub("#", "")
+    if #hex == 3 then
+        hex = hex:sub(1,1):rep(2) .. hex:sub(2,2):rep(2) .. hex:sub(3,3):rep(2)
+    end
+    if #hex ~= 6 or not hex:match("^[%da-fA-F]+$") then return nil end
+
+    local r = tonumber(hex:sub(1,2), 16)
+    local g = tonumber(hex:sub(3,4), 16)
+    local b = tonumber(hex:sub(5,6), 16)
+
+    if not r or not g or not b then return nil end
+    return Color3.fromRGB(r, g, b)
+end
+
+local function getOverlaySurfaceColor()
+    return shadeColor(Theme.CardHover, 1.16)
+end
+
+------------------------------------------------------------
+-- EXECUTOR GLOBAL RESOLVER
+------------------------------------------------------------
+local function collectExecutorEnvironments()
+    local environments = {}
+    local seen = {}
+
+    local function addEnvironment(env)
+        if type(env) == "table" and not seen[env] then
+            seen[env] = true
+            table.insert(environments, env)
+        end
+    end
+
+    -- Executor APIs are commonly injected into the current/getgenv environment
+    -- without also being copied into _G. Resolve those environments directly,
+    -- matching how Linoria/Obsidian expect executor globals to be available.
+    local okGenv, genv = pcall(function()
+        if type(getgenv) == "function" then
+            return getgenv()
+        end
+        return nil
+    end)
+    if okGenv then addEnvironment(genv) end
+
+    addEnvironment(_G)
+    return environments
+end
+
+local function getExecutorGlobal(name)
+    for _, env in ipairs(collectExecutorEnvironments()) do
+        local ok, value = pcall(function()
+            return env[name]
+        end)
+        if ok and value ~= nil then return value end
+    end
+    return nil
+end
+
+local function getExecutorFunction(name)
+    local value = getExecutorGlobal(name)
+    if type(value) == "function" then
+        return value
+    end
+    return nil
+end
+
+local FILE_API_ALIASES = {
+    Write = { "writefile", "write_file", "writeFile" },
+    Read = { "readfile", "read_file", "readFile" },
+    Exists = { "isfile", "is_file", "fileexists", "file_exists" },
+    Delete = { "delfile", "deletefile", "delete_file", "removefile", "remove_file" },
+    MakeDirectory = { "makefolder", "make_folder", "mkdir" },
+    IsDirectory = { "isfolder", "is_folder", "folderexists", "folder_exists" },
+    List = { "listfiles", "list_files" },
+}
+
+local FILE_NAMESPACE_ALIASES = {
+    Write = { "writefile", "write_file", "write", "save" },
+    Read = { "readfile", "read_file", "read", "load" },
+    Exists = { "isfile", "is_file", "exists", "file_exists" },
+    Delete = { "delfile", "deletefile", "delete_file", "delete", "remove" },
+    MakeDirectory = { "makefolder", "make_folder", "mkdir", "createfolder", "create_folder" },
+    IsDirectory = { "isfolder", "is_folder", "folder_exists", "directory_exists" },
+    List = { "listfiles", "list_files", "list" },
+}
+
+local FILE_NAMESPACE_NAMES = { "filesystem", "fs", "FileSystem" }
+
+local function resolveExecutorFunction(aliases)
+    for _, name in ipairs(aliases or {}) do
+        local fn = getExecutorFunction(name)
+        if fn then return fn, name end
+    end
+    return nil, nil
+end
+
+local function bindNamespaceFunction(namespace, fn)
+    return function(...)
+        local direct = table.pack(pcall(fn, ...))
+        if direct[1] then
+            return table.unpack(direct, 2, direct.n)
+        end
+
+        local method = table.pack(pcall(fn, namespace, ...))
+        if method[1] then
+            return table.unpack(method, 2, method.n)
+        end
+
+        error(tostring(direct[2] or method[2] or "filesystem call failed"), 2)
+    end
+end
+
+local function resolveFilesystemFunction(kind)
+    local direct, directName = resolveExecutorFunction(FILE_API_ALIASES[kind])
+    if direct then return direct, directName end
+
+    for _, namespaceName in ipairs(FILE_NAMESPACE_NAMES) do
+        local namespace = getExecutorGlobal(namespaceName)
+        if type(namespace) == "table" then
+            for _, methodName in ipairs(FILE_NAMESPACE_ALIASES[kind] or {}) do
+                local fn = rawget(namespace, methodName)
+                if type(fn) == "function" then
+                    return bindNamespaceFunction(namespace, fn), namespaceName .. "." .. methodName
+                end
+            end
+        end
+    end
+
+    return nil, nil
+end
+
+Library.ExecutorAdapterClass = Library.ExecutorAdapterClass or {}
+Library.ExecutorAdapterClass.__index = Library.ExecutorAdapterClass
+
+function Library.ExecutorAdapterClass.new()
+    return setmetatable({}, Library.ExecutorAdapterClass)
+end
+
+function Library.ExecutorAdapterClass:Get(name)
+    return getExecutorGlobal(name)
+end
+
+function Library.ExecutorAdapterClass:GetFunction(name)
+    return getExecutorFunction(name)
+end
+
+function Library.ExecutorAdapterClass:Has(name)
+    return getExecutorGlobal(name) ~= nil
+end
+
+function Library.ExecutorAdapterClass:SetClipboard(value)
+    local fn = getExecutorFunction("setclipboard")
+    if not fn then return false, "setclipboard is unavailable" end
+    local ok, err = pcall(fn, tostring(value or ""))
+    return ok, err
+end
+
+function Library.ExecutorAdapterClass:GetClipboard()
+    local fn = getExecutorFunction("getclipboard")
+    if not fn then return false, "getclipboard is unavailable" end
+    local ok, value = pcall(fn)
+    return ok, value
+end
+
+Library.ExecutorAdapter = Library.ExecutorAdapter or Library.ExecutorAdapterClass.new()
+
+function Library:GetExecutorAdapter()
+    return self.ExecutorAdapter
+end
+
+local ExecutorStorageAdapter = {}
+ExecutorStorageAdapter.__index = ExecutorStorageAdapter
+
+function ExecutorStorageAdapter.new()
+    local writeFile, writeSource = resolveFilesystemFunction("Write")
+    local readFile, readSource = resolveFilesystemFunction("Read")
+    local isFile = resolveFilesystemFunction("Exists")
+    local deleteFile = resolveFilesystemFunction("Delete")
+    local makeFolder = resolveFilesystemFunction("MakeDirectory")
+    local isFolder = resolveFilesystemFunction("IsDirectory")
+    local listFiles = resolveFilesystemFunction("List")
+
+    return setmetatable({
+        WriteFile = writeFile,
+        ReadFile = readFile,
+        IsFile = isFile,
+        DeleteFile = deleteFile,
+        MakeFolder = makeFolder,
+        IsFolder = isFolder,
+        ListFiles = listFiles,
+        APIName = writeSource or readSource or "Unavailable",
+    }, ExecutorStorageAdapter)
+end
+
+function ExecutorStorageAdapter:IsPersistent()
+    return self:IsAvailable()
+end
+
+function ExecutorStorageAdapter:SupportsDirectories()
+    return type(self.MakeFolder) == "function"
+end
+
+function ExecutorStorageAdapter:IsAvailable()
+    return type(self.WriteFile) == "function"
+        and type(self.ReadFile) == "function"
+end
+
+function ExecutorStorageAdapter:Write(path, data)
+    if type(self.WriteFile) ~= "function" then
+        error("writefile is unavailable")
+    end
+    return self.WriteFile(path, data)
+end
+
+function ExecutorStorageAdapter:Read(path)
+    if type(self.ReadFile) ~= "function" then
+        error("readfile is unavailable")
+    end
+    return self.ReadFile(path)
+end
+
+function ExecutorStorageAdapter:Exists(path)
+    if type(self.IsFile) == "function" then
+        return self.IsFile(path)
+    end
+    if type(self.ReadFile) == "function" then
+        local ok = pcall(self.ReadFile, path)
+        return ok
+    end
+    return false
+end
+
+function ExecutorStorageAdapter:Delete(path)
+    if type(self.DeleteFile) == "function" then
+        return self.DeleteFile(path)
+    end
+    return false
+end
+
+function ExecutorStorageAdapter:MakeDirectory(path)
+    if type(self.MakeFolder) == "function" then
+        return self.MakeFolder(path)
+    end
+    return false
+end
+
+function ExecutorStorageAdapter:IsDirectory(path)
+    if type(self.IsFolder) ~= "function" then
+        return false
+    end
+    return self.IsFolder(path)
+end
+
+function ExecutorStorageAdapter:List(path)
+    if type(self.ListFiles) ~= "function" then
+        return {}
+    end
+    return self.ListFiles(path)
+end
+
+local MemoryStorageAdapter = {}
+MemoryStorageAdapter.__index = MemoryStorageAdapter
+
+function MemoryStorageAdapter.new()
+    return setmetatable({
+        Files = {},
+        Directories = {
+            ["MistHub"] = true,
+            ["MistHub/Configs"] = true,
+        },
+    }, MemoryStorageAdapter)
+end
+
+function MemoryStorageAdapter:IsAvailable()
+    return true
+end
+
+function MemoryStorageAdapter:Write(path, data)
+    self.Files[path] = tostring(data or "")
+    return true
+end
+
+function MemoryStorageAdapter:Read(path)
+    if self.Files[path] == nil then
+        error("file does not exist: " .. tostring(path))
+    end
+    return self.Files[path]
+end
+
+function MemoryStorageAdapter:Exists(path)
+    return self.Files[path] ~= nil
+end
+
+function MemoryStorageAdapter:Delete(path)
+    self.Files[path] = nil
+    return true
+end
+
+function MemoryStorageAdapter:MakeDirectory(path)
+    self.Directories[path] = true
+    return true
+end
+
+function MemoryStorageAdapter:IsDirectory(path)
+    return self.Directories[path] == true
+end
+
+function MemoryStorageAdapter:List(path)
+    local out = {}
+    local prefix = tostring(path or "")
+    if prefix ~= "" and prefix:sub(-1) ~= "/" then
+        prefix = prefix .. "/"
+    end
+
+    for filePath in pairs(self.Files) do
+        if filePath:sub(1, #prefix) == prefix then
+            table.insert(out, filePath)
+        end
+    end
+
+    table.sort(out)
+    return out
+end
+
+Library.StorageAdapters = {
+    Executor = ExecutorStorageAdapter,
+    Memory = MemoryStorageAdapter,
+}
+
+do
+    if Library.StorageAdapter == nil then
+        Library.StorageAdapter = ExecutorStorageAdapter.new()
+        if not Library.StorageAdapter:IsAvailable() then
+            Library.StorageFallbackReason = "No persistent executor filesystem API was detected"
+        end
+    end
+end
+
+function Library:SetStorageAdapter(adapter)
+    if type(adapter) ~= "table" then
+        return false
+    end
+
+    self.StorageAdapter = adapter
+    return true
+end
+
+function Library:GetStorageAdapter()
+    if not self.StorageAdapter then
+        self.StorageAdapter = ExecutorStorageAdapter.new()
+        if not self.StorageAdapter:IsAvailable() then
+            self.StorageFallbackReason = "No persistent executor filesystem API was detected"
+        end
+    end
+    return self.StorageAdapter
+end
+
+function Library:UseMemoryStorage()
+    self.StorageAdapter = MemoryStorageAdapter.new()
+    self.StorageFallbackReason = self.StorageFallbackReason or "Memory storage selected"
+    return self.StorageAdapter
+end
+
+function Library:IsPersistentStorage()
+    local adapter = self:GetStorageAdapter()
+    if getmetatable(adapter) == ExecutorStorageAdapter then
+        return adapter:IsAvailable()
+    end
+    if type(adapter.IsPersistent) == "function" then
+        local ok, result = pcall(adapter.IsPersistent, adapter)
+        return ok and result == true
+    end
+    return false
+end
+
+function Library:GetStorageStatus()
+    return {
+        Name = self:GetStorageAdapterName(),
+        Persistent = self:IsPersistentStorage(),
+        FallbackReason = self.StorageFallbackReason,
+    }
+end
+
+function Library:GetStorageAdapterName()
+    local adapter = self:GetStorageAdapter()
+    if getmetatable(adapter) == MemoryStorageAdapter then
+        return "Memory"
+    end
+    if getmetatable(adapter) == ExecutorStorageAdapter then
+        if adapter:IsAvailable() and adapter.APIName and adapter.APIName ~= "Unavailable" then
+            return "Executor · " .. tostring(adapter.APIName)
+        end
+        return "Executor"
+    end
+    return "Custom"
+end
+

@@ -1,0 +1,37 @@
+MistUI v4.0 Stable / Quality release validation
+
+Release source: src/*.luau.part (6 ordered fragments)
+Executor build: dist/MistUI.lua
+Version: 4.0.0
+Config SchemaVersion: 5 (preserved for backward compatibility)
+Lines: 18686
+SHA256: 382dff6d9f61e3a37cf00a6042338ce31577e2aae4241380fd3f48c51b907c4c
+
+STATIC / BUILD VALIDATION
+- Deterministic source -> dist build: PASS
+- Source lexical/bracket sanity: PASS
+- Static structural audit: PASS
+- Public API compatibility/freeze contract: PASS
+- Release SHA256 manifest verification: PASS
+- Python tooling compilation: PASS
+- Public API snapshot: Card 76 methods; Library 41 methods; Window 149 methods
+- Release ends with return Library: PASS
+- Built-in hub/demo bootstrap in executor release: NONE
+- Generic Card:Add("Dropdown") legacy compatibility route: PRESERVED
+- Config SchemaVersion 5 compatibility guard: PRESENT
+- v4 quality capabilities: PRESENT
+  Doctor / leak diagnostics / profiler / debug panel / config transactions /
+  config validation / error boundaries / API contracts / virtualized large
+  lists / structural layout snapshots
+
+QUALITY / PERFORMANCE HARNESS INCLUDED
+- tests/runtime_smoke.luau
+- tests/runtime_quality.luau
+- tests/runtime_stress.luau (100 lifecycle cycles by default)
+- tests/runtime_benchmark.luau (500 controls + 2000-option large-list checks by default)
+
+TARGET-RUNTIME STATUS
+Roblox/executor runtime tests: NOT EXECUTED IN THIS BUILD ENVIRONMENT.
+No target executor/device is marked Pass merely because static checks passed.
+See docs/COMPATIBILITY.md. Runtime smoke/quality/stress/benchmark suites must be
+run in each claimed environment before changing that matrix to Pass.

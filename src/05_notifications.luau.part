@@ -1,0 +1,531 @@
+function Library:Notify(config)
+    config = config or {}
+    if not self._screenGui then return end
+
+    local settings = Library.NotificationSettings or {
+        Enabled = true,
+        ProgressBar = true,
+        Position = "TOP RIGHT",
+        Duration = 4,
+        MaxVisible = 4,
+        PauseOnHover = true,
+    }
+
+    if Library.InterfaceSettings and Library.InterfaceSettings.SilentMode and not config.Force then
+        return
+    end
+    if settings.Enabled == false and not config.Force then
+        return
+    end
+
+    Library.ActiveNotifications = Library.ActiveNotifications or {}
+
+    local groupKey = config.GroupKey and tostring(config.GroupKey) or nil
+    if groupKey then
+        for id, entry in pairs(Library.ActiveNotifications) do
+            if entry.GroupKey == groupKey and entry.Instance and entry.Instance.Parent then
+                entry.Count = (entry.Count or 1) + 1
+                Library:UpdateNotification(id, {
+                    Title = config.Title or entry.Title,
+                    Content = config.Content or entry.Content,
+                    Count = entry.Count,
+                    Duration = config.Duration,
+                })
+                return entry.Instance, id
+            end
+        end
+    end
+
+    local holder = ensureNotifHolder(self._screenGui)
+    applyNotifHolderLayout(holder)
+
+    local maxVisible = math.max(1, tonumber(settings.MaxVisible) or 4)
+    local existing = {}
+    for _, child in ipairs(holder:GetChildren()) do
+        if child:IsA("Frame") or child:IsA("CanvasGroup") then
+            existing[#existing + 1] = child
+        end
+    end
+    table.sort(existing, function(a,b) return a.LayoutOrder < b.LayoutOrder end)
+    while #existing >= maxVisible do
+        local oldest = table.remove(existing, #existing)
+        if oldest and oldest.Parent then
+            local oldId = oldest:GetAttribute("NotificationId")
+            local oldEntry = oldId and Library.ActiveNotifications[tostring(oldId)] or nil
+            if oldEntry and oldEntry.Dismiss then
+                oldEntry.Dismiss(false)
+            else
+                if oldId then Library.ActiveNotifications[tostring(oldId)] = nil end
+                oldest:Destroy()
+            end
+        end
+    end
+
+    local notifType = config.Type or "Info"
+    local color = getNotifColor(notifType)
+    local duration = math.max(0.1, tonumber(config.Duration) or tonumber(settings.Duration) or 4)
+    local priority = tonumber(config.Priority) or 0
+    local notifId = tostring(config.Id or ("notif_" .. tostring(math.floor(os.clock()*100000)) .. "_" .. tostring(math.random(1000,9999))))
+    local hasAction = type(config.OnAction) == "function"
+        and tostring(config.ActionText or "") ~= ""
+    local closable = config.Closable ~= false
+
+    local cardHeight = hasAction and 108 or 78
+    local contentHeight = hasAction and 22 or 28
+
+    local notif = create("CanvasGroup", {
+        Name = "Notification",
+        BackgroundColor3 = Theme.Card,
+        BackgroundTransparency = 0,
+        GroupTransparency = 0,
+        BorderSizePixel = 0,
+        Size = UDim2.new(1, 0, 0, cardHeight),
+        ClipsDescendants = true,
+        LayoutOrder = -priority * 100000 + math.floor(os.clock()*1000),
+        ZIndex = 51,
+        Parent = holder,
+    }, {
+        corner(12),
+        stroke(Theme.StrokeSoft, 1, 0.38),
+    })
+    notif:SetAttribute("NotificationId", notifId)
+    if groupKey then notif:SetAttribute("GroupKey", groupKey) end
+
+    local iconBubble = create("Frame", {
+        Name = "IconBubble",
+        BackgroundColor3 = color,
+        BackgroundTransparency = 0.82,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, 14, 0, 17),
+        Size = UDim2.new(0, 34, 0, 34),
+        ZIndex = 52,
+        Parent = notif,
+    }, { corner(9999) })
+    local notifIconHolder = create("Frame", {
+        Name = "Icon",
+        BackgroundTransparency = 1,
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        Size = UDim2.new(0, 20, 0, 20),
+        ZIndex = 53,
+        Parent = iconBubble,
+    })
+    local notifIcon = buildIcon(notifIconHolder, NOTIF_ICONS[notifType] or "info", 18, color)
+
+    local titleLabel = create("TextLabel", {
+        Name = "Title",
+        Text = tostring(config.Title or "Notification"),
+        FontFace = Theme.FontSemibold,
+        TextSize = 14,
+        TextColor3 = Theme.Text,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 60, 0, 13),
+        Size = UDim2.new(1, closable and -100 or -76, 0, 18),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+        ZIndex = 52,
+        Parent = notif,
+    })
+
+    local contentLabel = create("TextLabel", {
+        Name = "Content",
+        Text = tostring(config.Content or ""),
+        FontFace = Theme.Font,
+        TextSize = 12,
+        TextColor3 = Theme.TextDark,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 60, 0, 34),
+        Size = UDim2.new(1, -76, 0, contentHeight),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Top,
+        TextWrapped = true,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+        ZIndex = 52,
+        Parent = notif,
+    })
+
+    local progressTrack = create("Frame", {
+        Name = "ProgressTrack",
+        BackgroundColor3 = Theme.Field,
+        BackgroundTransparency = 0.15,
+        BorderSizePixel = 0,
+        Visible = settings.ProgressBar ~= false,
+        AnchorPoint = Vector2.new(0, 1),
+        Position = UDim2.new(0, 12, 1, -7),
+        Size = UDim2.new(1, -24, 0, settings.ProgressBar == false and 0 or 3),
+        ZIndex = 52,
+        Parent = notif,
+    }, { corner(9999) })
+
+    local progressFill = create("Frame", {
+        Name = "ProgressFill",
+        BackgroundColor3 = color,
+        BorderSizePixel = 0,
+        Size = UDim2.new(0, 0, 1, 0),
+        ZIndex = 53,
+        Parent = progressTrack,
+    }, { corner(9999) })
+
+    local notifScale = create("UIScale", { Scale = 0.985, Parent = notif })
+    local alive = true
+    local paused = false
+    local elapsed = 0
+    local closing = false
+
+    local entry = {
+        Id = notifId,
+        CreatedAt = os.clock(),
+        Instance = notif,
+        Title = titleLabel.Text,
+        Content = contentLabel.Text,
+        GroupKey = groupKey,
+        Count = 1,
+        Duration = duration,
+        Elapsed = 0,
+        Type = notifType,
+        ProgressFill = progressFill,
+        ProgressTrack = progressTrack,
+        IconBubble = iconBubble,
+        IconHolder = notifIconHolder,
+        IconVisual = notifIcon,
+        TitleLabel = titleLabel,
+        ContentLabel = contentLabel,
+        Color = color,
+    }
+    Library.ActiveNotifications[notifId] = entry
+
+    local function dismiss(immediate)
+        if closing then return end
+        closing = true
+        alive = false
+        Library.ActiveNotifications[notifId] = nil
+        if not notif or not notif.Parent then return end
+        if immediate then notif:Destroy(); return end
+
+        -- Fade first, then collapse the row so the remaining notifications glide
+        -- into place instead of jumping when this one is destroyed.
+        tween(notif, { GroupTransparency = 1 }, 0.16, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+        tween(notifScale, { Scale = 0.95 }, 0.16, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+        task.delay(0.12, function()
+            if notif and notif.Parent then
+                tween(notif, { Size = UDim2.new(1, 0, 0, 0) }, 0.14, Enum.EasingStyle.Quint, Enum.EasingDirection.InOut)
+            end
+        end)
+        task.delay(0.28, function()
+            if notif and notif.Parent then notif:Destroy() end
+        end)
+    end
+    entry.Dismiss = dismiss
+    entry.ResetTimer = function()
+        elapsed = 0
+        entry.Elapsed = 0
+    end
+
+    if closable then
+        local closeButton = create("TextButton", {
+            Name = "Close",
+            Text = "",
+            AutoButtonColor = false,
+            BackgroundColor3 = Theme.SurfaceTint,
+            BackgroundTransparency = 1,
+            AnchorPoint = Vector2.new(1, 0),
+            Position = UDim2.new(1, -10, 0, 9),
+            Size = UDim2.new(0, 26, 0, 26),
+            ZIndex = 54,
+            Parent = notif,
+        }, { corner(7) })
+        local closeIcon = buildIcon(closeButton, "x", 15, Theme.TextDark)
+        closeButton.MouseEnter:Connect(function()
+            tween(closeButton, { BackgroundTransparency = 0.90 }, 0.10)
+            setIconColor(closeIcon, Theme.Error, 0.10)
+        end)
+        closeButton.MouseLeave:Connect(function()
+            tween(closeButton, { BackgroundTransparency = 1 }, 0.10)
+            setIconColor(closeIcon, Theme.TextDark, 0.10)
+        end)
+        closeButton.MouseButton1Click:Connect(function() dismiss(false) end)
+    end
+
+    if hasAction then
+        local actionButton = create("TextButton", {
+            Name = "Action",
+            Text = tostring(config.ActionText),
+            FontFace = Theme.FontSemibold,
+            TextSize = 12,
+            TextColor3 = color,
+            AutoButtonColor = false,
+            BackgroundColor3 = color,
+            BackgroundTransparency = 0.88,
+            BorderSizePixel = 0,
+            AnchorPoint = Vector2.new(0.5, 0),
+            Position = UDim2.new(0.5, 0, 0, 64),
+            Size = UDim2.new(0, 124, 0, 28),
+            ZIndex = 53,
+            Parent = notif,
+        }, { corner(7) })
+        actionButton.MouseEnter:Connect(function()
+            tween(actionButton, { BackgroundTransparency = 0.80 }, 0.10)
+        end)
+        actionButton.MouseLeave:Connect(function()
+            tween(actionButton, { BackgroundTransparency = 0.88 }, 0.12)
+        end)
+        actionButton.MouseButton1Click:Connect(function()
+            Library:SafeCall(config.OnAction, notifId)
+            if config.CloseOnAction ~= false then dismiss(false) end
+        end)
+    end
+
+    notif.MouseEnter:Connect(function()
+        smoothTween(notif, { BackgroundColor3 = Theme.CardHover }, 0.16)
+        local shouldPause = config.PauseOnHover
+        if shouldPause == nil then shouldPause = settings.PauseOnHover end
+        if shouldPause ~= false then paused = true end
+    end)
+    notif.MouseLeave:Connect(function()
+        smoothTween(notif, { BackgroundColor3 = Theme.Card }, 0.18)
+        paused = false
+    end)
+
+    notif.GroupTransparency = 1
+    notifScale.Scale = 0.95
+    tween(notif, { GroupTransparency = 0 }, 0.20, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    tween(notifScale, { Scale = 1 }, 0.20, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+    task.spawn(function()
+        local last = os.clock()
+        while alive and notif.Parent do
+            local now = os.clock()
+            local dt = now - last
+            last = now
+            if not paused then
+                elapsed += dt
+                entry.Elapsed = elapsed
+            end
+            local activeDuration = duration
+            if type(entry.Duration) == "number" then
+                activeDuration = entry.Duration
+            end
+            local alpha = math.clamp(elapsed / math.max(0.1, activeDuration), 0, 1)
+            if progressFill and progressFill.Parent then progressFill.Size = UDim2.new(alpha, 0, 1, 0) end
+            if alpha >= 1 then break end
+            RunService.Heartbeat:Wait()
+        end
+        if alive and notif.Parent then dismiss(false) end
+    end)
+
+    return notif, notifId
+end
+
+function Library:UpdateNotification(id, changes)
+    id = tostring(id or "")
+    local entry = Library.ActiveNotifications and Library.ActiveNotifications[id]
+    if not entry or not entry.Instance or not entry.Instance.Parent then return false end
+    changes = changes or {}
+    if changes.Title ~= nil then entry.Title = tostring(changes.Title); entry.TitleLabel.Text = entry.Title end
+    if changes.Content ~= nil then
+        entry.Content = tostring(changes.Content)
+        entry.ContentLabel.Text = entry.Content
+    end
+
+    if changes.Type ~= nil then
+        entry.Type = tostring(changes.Type)
+        entry.Color = getNotifColor(entry.Type)
+
+        if entry.ProgressFill then
+            entry.ProgressFill.BackgroundColor3 = entry.Color
+        end
+
+        if entry.IconBubble then
+            entry.IconBubble.BackgroundColor3 = entry.Color
+        end
+        if entry.IconVisual then
+            setIconColor(entry.IconVisual, entry.Color, 0.10)
+        end
+    end
+
+    local changedCount = changes.Count
+    if type(changedCount) == "number" and changedCount > 1 then
+        entry.TitleLabel.Text = entry.Title .. "  ×" .. tostring(math.floor(changedCount))
+    end
+
+    local changedDuration = changes.Duration
+    if type(changedDuration) == "number" then
+        entry.Duration = math.max(0.1, changedDuration)
+        if entry.ResetTimer then entry.ResetTimer() else entry.Elapsed = 0 end
+    elseif changes.ResetTimer == true and entry.ResetTimer then
+        entry.ResetTimer()
+    end
+    if changes.Progress ~= nil and entry.ProgressFill then
+        entry.ProgressFill.Size = UDim2.new(math.clamp(tonumber(changes.Progress) or 0,0,1),0,1,0)
+    end
+    return true
+end
+
+function Library:RefreshNotificationTheme()
+    for _, entry in pairs(Library.ActiveNotifications or {}) do
+        if entry and entry.Instance and entry.Instance.Parent then
+            local color = getNotifColor(entry.Type or "Info")
+            entry.Color = color
+
+            entry.Instance.BackgroundColor3 = Theme.Card
+
+            if entry.TitleLabel then
+                entry.TitleLabel.TextColor3 = Theme.Text
+            end
+
+            if entry.ContentLabel then
+                entry.ContentLabel.TextColor3 = Theme.TextDark
+            end
+
+            if entry.ProgressTrack then
+                entry.ProgressTrack.BackgroundColor3 = Theme.Field
+            end
+
+            if entry.ProgressFill then
+                entry.ProgressFill.BackgroundColor3 = color
+            end
+
+            if entry.IconBubble then
+                entry.IconBubble.BackgroundColor3 = color
+            end
+        end
+    end
+
+    return true
+end
+
+function Library:GetLatestNotificationId()
+    local latestId = nil
+    local latestTime = -math.huge
+
+    for id, entry in pairs(Library.ActiveNotifications or {}) do
+        if entry
+            and entry.Instance
+            and entry.Instance.Parent
+            and type(entry.CreatedAt) == "number"
+            and entry.CreatedAt > latestTime then
+            latestTime = entry.CreatedAt
+            latestId = tostring(id)
+        end
+    end
+
+    return latestId
+end
+
+function Library:DismissNotification(id, immediate)
+    local wantedId = id ~= nil and tostring(id) or ""
+
+    -- No id or a stale id means "dismiss the newest remaining notification".
+    local entry = wantedId ~= ""
+        and Library.ActiveNotifications
+        and Library.ActiveNotifications[wantedId]
+        or nil
+
+    if not entry or not entry.Instance or not entry.Instance.Parent then
+        wantedId = Library:GetLatestNotificationId()
+        entry = wantedId
+            and Library.ActiveNotifications
+            and Library.ActiveNotifications[wantedId]
+            or nil
+    end
+
+    if not entry then
+        return false, "No active notifications."
+    end
+
+    if entry.Dismiss then
+        entry.Dismiss(immediate == true)
+        return true, wantedId
+    end
+
+    return false, "Notification cannot be dismissed."
+end
+
+function Library:DismissLatestNotification(immediate)
+    return Library:DismissNotification(nil, immediate)
+end
+
+
+function Library:ClearNotifications()
+    Library.ActiveNotifications = Library.ActiveNotifications or {}
+    table.clear(Library.ActiveNotifications)
+    if not NotifHolder then
+        return 0
+    end
+
+    local removed = 0
+    for _, child in ipairs(NotifHolder:GetChildren()) do
+        if child:IsA("Frame") or child:IsA("CanvasGroup") then
+            child:Destroy()
+            removed += 1
+        end
+    end
+
+    return removed
+end
+
+function Library:SetNotificationSettings(settings)
+    settings = settings or {}
+    Library.NotificationSettings = Library.NotificationSettings or {
+        Enabled = true,
+        ProgressBar = true,
+        Position = "TOP RIGHT",
+        Duration = 4,
+        MaxVisible = 4,
+        PauseOnHover = true,
+    }
+
+    local target = Library.NotificationSettings
+
+    if settings.Enabled ~= nil then
+        target.Enabled = settings.Enabled == true
+    end
+
+    if settings.ProgressBar ~= nil then
+        target.ProgressBar = settings.ProgressBar == true
+    end
+
+    if settings.Position ~= nil then
+        local position = string.upper(tostring(settings.Position))
+        if position == "TOP RIGHT"
+            or position == "TOP LEFT"
+            or position == "BOTTOM RIGHT"
+            or position == "BOTTOM LEFT" then
+            target.Position = position
+        end
+    end
+
+    local notificationDuration = settings.Duration
+    if type(notificationDuration) == "number" then
+        target.Duration = math.max(0.1, notificationDuration)
+    end
+
+    local notificationMaxVisible = settings.MaxVisible
+    if type(notificationMaxVisible) == "number" then
+        target.MaxVisible = math.max(1, math.floor(notificationMaxVisible))
+    end
+
+    if settings.PauseOnHover ~= nil then
+        target.PauseOnHover = settings.PauseOnHover == true
+    end
+
+    if NotifHolder and NotifHolder.Parent then
+        applyNotifHolderLayout(NotifHolder)
+    end
+
+    return target
+end
+
+function Library:GetNotificationSettings()
+    local source = Library.NotificationSettings or {}
+    return {
+        Enabled = source.Enabled,
+        ProgressBar = source.ProgressBar,
+        Position = source.Position,
+        Duration = source.Duration,
+        MaxVisible = source.MaxVisible,
+        PauseOnHover = source.PauseOnHover,
+    }
+end
+
+return Library
