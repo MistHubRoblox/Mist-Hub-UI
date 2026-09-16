@@ -26,7 +26,6 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          import base64
 
           root = Path('.')
           replacements = {
@@ -63,9 +62,8 @@ jobs:
               for old, new in pairs:
                   text = text.replace(old, new)
               path.write_text(text, encoding='utf-8')
-
-          # Regenerate the single-file distribution and checksum from source.
           PY
+
           python tools/build.py
           python tools/release.py
 
@@ -79,8 +77,9 @@ jobs:
           ]
 
           hits = []
+          ignored = {Path('.github/workflows/cleanup-references.yml')}
           for path in Path('.').rglob('*'):
-              if not path.is_file() or '.git' in path.parts:
+              if not path.is_file() or '.git' in path.parts or path in ignored:
                   continue
               try:
                   text = path.read_text(encoding='utf-8')
