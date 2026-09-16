@@ -2193,7 +2193,7 @@ local function collectExecutorEnvironments()
 
     -- Executor APIs are commonly injected into the current/getgenv environment
     -- without also being copied into _G. Resolve those environments directly,
-    -- matching how Linoria/Obsidian expect executor globals to be available.
+    -- so executor globals remain available across supported environments.
     local okGenv, genv = pcall(function()
         if type(getgenv) == "function" then
             return getgenv()
@@ -5866,7 +5866,7 @@ function Library:CreateWindow(config)
     ------------------------------------------------------------
     local configurationPage = createSettingsPage("Configuration")
 
-    -- Linoria/Obsidian-style persistent config storage.
+    -- Persistent filesystem-based config storage.
     -- No memory fallback and no config index file: configs are real files
     -- under <folder>/settings and the list is built with listfiles().
     Library.ConfigFolder = Library.ConfigFolder or "MistHub"
@@ -6027,7 +6027,7 @@ function Library:CreateWindow(config)
         end
     end
 
-    -- Linoria/Obsidian list configs directly from the settings folder.
+    -- Configs are listed directly from the settings folder.
     -- Keep compatibility no-ops for older internal callers; no index file is written.
     local function addConfigToIndex(_name)
         return true
@@ -6839,7 +6839,7 @@ function Library:CreateWindow(config)
     end, "secondary")
 
     -- Import/Export JSON UI intentionally removed. Configs are managed
-    -- exclusively through persistent files, matching Linoria/Obsidian.
+    -- exclusively through persistent files.
 
     local manageSection = settingsSection(
         configurationPage,

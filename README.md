@@ -19,7 +19,7 @@ local Window = MistUI:CreateWindow({
 
 ## Why v4.0 Stable
 
-v3.1 closed the major feature/API gaps identified in the Linoria/Obsidian review. v4.0 deliberately shifts focus from adding controls to **reliability, lifecycle cleanup, API stability, diagnostics, testing and release engineering**. Config schema remains at 5 so existing profiles stay compatible.
+v3.1 closed the major feature/API gaps identified during earlier framework reviews. v4.0 deliberately shifts focus from adding controls to **reliability, lifecycle cleanup, API stability, diagnostics, testing and release engineering**. Config schema remains at 5 so existing profiles stay compatible.
 
 Highlights:
 
@@ -157,7 +157,7 @@ MistUI configs are intended to be persistent. The library detects common executo
 
 
 ### Config persistence
-MistUI now follows the same filesystem model used by Linoria/Obsidian-style SaveManagers: configs are persistent JSON files under `MistHub/settings`, the list is discovered with `listfiles`, and autoload is stored in `autoload.txt`. The Settings page no longer exposes JSON import/export or session-only config storage.
+MistUI now follows the persistent filesystem-based config model: configs are persistent JSON files under `MistHub/settings`, the list is discovered with `listfiles`, and autoload is stored in `autoload.txt`. The Settings page no longer exposes JSON import/export or session-only config storage.
 
 ## Complete Test Lab
 

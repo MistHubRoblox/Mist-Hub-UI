@@ -44,7 +44,7 @@ local function collectExecutorEnvironments()
 
     -- Executor APIs are commonly injected into the current/getgenv environment
     -- without also being copied into _G. Resolve those environments directly,
-    -- matching how Linoria/Obsidian expect executor globals to be available.
+    -- so executor globals remain available across supported environments.
     local okGenv, genv = pcall(function()
         if type(getgenv) == "function" then
             return getgenv()

@@ -6,7 +6,7 @@
 - moved the full QA/Test Lab to `examples/MistUI_TestLab.lua`
 - added a compact `examples/example.lua` integration sample
 - kept manual window resizing disabled
-- retained persistent Linoria/Obsidian-style config files and autoload behavior
+- retained persistent filesystem config files and autoload behavior
 - retained the official live `CreateActivity()` API
 - added CI checks preventing internal QA labels from leaking into the normal Settings surface
 - release policy: bug fixes use 4.0.x; additive compatible features use 4.1.x; breaking API changes wait for v5
@@ -134,7 +134,7 @@
 
 
 ## Config persistence rebuild
-- Replaced Mist's config storage layer with a Linoria/Obsidian-style filesystem flow.
+- Replaced Mist's config storage layer with a persistent filesystem flow.
 - Configs now live under `MistHub/settings/<name>.json`.
 - Config discovery uses `listfiles()`; no `config_index.json` is used.
 - Autoload is stored at `MistHub/settings/autoload.txt`.
