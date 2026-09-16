@@ -27,6 +27,9 @@ jobs:
           base64 -d /tmp/mist_payload.b64 > /tmp/mist_payload.tar.xz
           tar -xJf /tmp/mist_payload.tar.xz -C .
           rm -rf .bootstrap
+          # The Actions token cannot create/update workflow files. CI is added
+          # after bootstrap through the connected GitHub integration.
+          rm -f .github/workflows/ci.yml
 
       - name: Commit release
         shell: bash
