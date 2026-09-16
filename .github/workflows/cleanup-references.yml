@@ -1,0 +1,113 @@
+name: Cleanup MistUI references
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cleanup-references.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Remove external UI-library references
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import re
+
+          root = Path('.')
+          targets = [
+              root / 'README.md',
+              root / 'CHANGELOG.md',
+              root / 'AUDIT.txt',
+              root / 'src' / '02_helpers_icons.luau.part',
+              root / 'src' / '03_window_settings.luau.part',
+              root / 'examples' / 'MistUI_TestLab.lua',
+          ]
+
+          replacements = [
+              ('identified in the Linoria/Obsidian review', 'identified during earlier framework reviews'),
+              ('same filesystem model used by Linoria/Obsidian-style SaveManagers', 'persistent filesystem-based config model'),
+              ('retained persistent Linoria/Obsidian-style config files and autoload behavior', 'retained persistent filesystem config files and autoload behavior'),
+              ("Replaced Mist's config storage layer with a Linoria/Obsidian-style filesystem flow.", "Replaced Mist's config storage layer with a persistent filesystem flow."),
+              ('matching how Linoria/Obsidian expect executor globals to be available.', 'so executor globals remain available across supported environments.'),
+              ('-- Linoria/Obsidian-style persistent config storage.', '-- Persistent filesystem-based config storage.'),
+              ('-- Linoria/Obsidian list configs directly from the settings folder.', '-- Configs are listed directly from the settings folder.'),
+              ('-- exclusively through persistent files, matching Linoria/Obsidian.', '-- exclusively through persistent files.'),
+              ('Linoria/Obsidian-style', 'filesystem-based'),
+              ('Linoria/Obsidian', 'legacy reference'),
+              ('Linoria', 'legacy reference'),
+              ('Obsidian', 'legacy reference'),
+          ]
+
+          for path in targets:
+              if not path.exists():
+                  continue
+              text = path.read_text(encoding='utf-8')
+              for old, new in replacements:
+                  text = text.replace(old, new)
+              if path.name == 'AUDIT.txt':
+                  text = text.replace(
+                      'See docs/COMPATIBILITY.md. Runtime smoke/quality/stress/benchmark suites must be\nrun in each claimed environment before changing that matrix to Pass.\n',
+                      'Runtime smoke/quality/stress/benchmark suites must be run in each target environment\nbefore claiming runtime validation.\n'
+                  )
+              path.write_text(text, encoding='utf-8')
+
+          # Rebuild the player-facing distribution from the cleaned source.
+          import subprocess
+          subprocess.run(['python', 'tools/build.py'], check=True)
+          subprocess.run(['python', 'tools/release.py'], check=True)
+
+          # Keep the audit metadata accurate after the source-only comment cleanup.
+          dist = root / 'dist' / 'MistUI.lua'
+          audit = root / 'AUDIT.txt'
+          if audit.exists():
+              text = audit.read_text(encoding='utf-8')
+              digest = hashlib.sha256(dist.read_bytes()).hexdigest()
+              lines = len(dist.read_text(encoding='utf-8').splitlines())
+              text = re.sub(r'^Lines: \d+$', f'Lines: {lines}', text, flags=re.M)
+              text = re.sub(r'^SHA256: [0-9a-fA-F]+$', f'SHA256: {digest}', text, flags=re.M)
+              audit.write_text(text, encoding='utf-8')
+
+          banned = re.compile(r'linoria|obsidian|rayfield|orion\s*lib|kavo\s*ui|venyx|neverlose', re.I)
+          bad = []
+          for path in root.rglob('*'):
+              if not path.is_file() or '.git' in path.parts:
+                  continue
+              if path.as_posix() == '.github/workflows/cleanup-references.yml':
+                  continue
+              try:
+                  text = path.read_text(encoding='utf-8')
+              except Exception:
+                  continue
+              if banned.search(text):
+                  bad.append(path.as_posix())
+          if bad:
+              raise SystemExit('External UI-library references remain in: ' + ', '.join(sorted(bad)))
+          PY
+
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md CHANGELOG.md AUDIT.txt src/02_helpers_icons.luau.part src/03_window_settings.luau.part examples/MistUI_TestLab.lua dist/MistUI.lua dist/SHA256SUMS.txt
+          if git diff --cached --quiet; then
+            echo "No cleanup changes needed."
+            exit 0
+          fi
+          git commit -m "chore: remove external UI-library references"
+          git push
