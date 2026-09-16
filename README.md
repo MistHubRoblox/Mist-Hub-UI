@@ -10,7 +10,7 @@ The release is a **pure library**: loading it returns `Library`; it does not cre
 ## Quick start
 
 ```lua
-local MistUI = loadstring(game:HttpGet("YOUR_RAW_GITHUB_URL/dist/MistUI.lua"))()
+local MistUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/MistHubRoblox/Mist-Hub-UI/main/dist/MistUI.lua"))()
 local Window = MistUI:CreateWindow({
     Title = "My Interface",
     Responsive = true,
