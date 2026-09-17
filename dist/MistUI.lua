@@ -7411,14 +7411,25 @@ function Library:CreateWindow(config)
     -- Chamado sempre que uma tab é aberta ou fechada, já que a ordem
     -- exibida segue a sidebar e não a ordem de clique.
     local function refreshDividers()
-        if #self_.Tabs == 0 then return end
         local minOrder = math.huge
+        local visibleCount = 0
+
         for _, t in ipairs(self_.Tabs) do
-            if t._order and t._order < minOrder then minOrder = t._order end
+            local visible = t._btn and t._btn.Visible == true
+            if visible then
+                visibleCount += 1
+                if t._order and t._order < minOrder then
+                    minOrder = t._order
+                end
+            end
         end
+
         for _, t in ipairs(self_.Tabs) do
             if t._dividerBefore then
-                t._dividerBefore.Visible = (t._order ~= minOrder)
+                local visible = t._btn and t._btn.Visible == true
+                t._dividerBefore.Visible = visible
+                    and visibleCount > 1
+                    and t._order ~= minOrder
             end
         end
     end
@@ -7566,6 +7577,12 @@ function Library:CreateWindow(config)
 
         for _, tab in ipairs(self_.Tabs) do
             if tab.Name == name then
+                if tab.Category then
+                    self_:_EnforceSingleSidebarItem(
+                        tab.Category,
+                        tab.OwnerKey
+                    )
+                end
                 selectTab(tab)
                 return tab
             end
@@ -10219,14 +10236,29 @@ function Library:CreateWindow(config)
     -- Only one sidebar item/group is kept open at a time.
     -- Sub-tabs from the same group share an OwnerKey and stay together.
     function self_:_EnforceSingleSidebarItem(category, ownerKey)
-        local toClose = {}
+        -- Sidebar pages are lazy-built once and then cached. Switching
+        -- groups only changes visibility, avoiding repeated component,
+        -- icon, layout and event construction on every click.
         for _, t in ipairs(self_.Tabs) do
-            if t.Category ~= category or t.OwnerKey ~= ownerKey then
-                table.insert(toClose, t)
+            local sameOwner = t.Category == category
+                and t.OwnerKey == ownerKey
+
+            if t._btn and t._btn.Parent then
+                t._btn.Visible = sameOwner
+            end
+
+            if t._dividerBefore and t._dividerBefore.Parent then
+                t._dividerBefore.Visible = false
+            end
+
+            local tabPage = rawget(t, "Page")
+            if tabPage then
+                tabPage.Visible = sameOwner and self_._activeTab == t
             end
         end
-        for _, t in ipairs(toClose) do closeTab(t) end
+
         self_._activeCategory = category
+        refreshDividers()
     end
 
     -- Creates (or focuses) a tab from a sidebar item.
