@@ -1,0 +1,156 @@
+name: Optimize sidebar tab switching
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/optimize-sidebar-tabs.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Cache sidebar tabs instead of rebuilding them
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          files = [
+              Path('src/03_window_settings.luau.part'),
+              Path('dist/MistUI.lua'),
+          ]
+
+          old_refresh = '''    local function refreshDividers()
+              if #self_.Tabs == 0 then return end
+              local minOrder = math.huge
+              for _, t in ipairs(self_.Tabs) do
+                  if t._order and t._order < minOrder then minOrder = t._order end
+              end
+              for _, t in ipairs(self_.Tabs) do
+                  if t._dividerBefore then
+                      t._dividerBefore.Visible = (t._order ~= minOrder)
+                  end
+              end
+          end'''
+
+          new_refresh = '''    local function refreshDividers()
+              local minOrder = math.huge
+              local visibleCount = 0
+
+              for _, t in ipairs(self_.Tabs) do
+                  local visible = t._btn and t._btn.Visible == true
+                  if visible then
+                      visibleCount += 1
+                      if t._order and t._order < minOrder then
+                          minOrder = t._order
+                      end
+                  end
+              end
+
+              for _, t in ipairs(self_.Tabs) do
+                  if t._dividerBefore then
+                      local visible = t._btn and t._btn.Visible == true
+                      t._dividerBefore.Visible = visible
+                          and visibleCount > 1
+                          and t._order ~= minOrder
+                  end
+              end
+          end'''
+
+          old_enforce = '''    function self_:_EnforceSingleSidebarItem(category, ownerKey)
+              local toClose = {}
+              for _, t in ipairs(self_.Tabs) do
+                  if t.Category ~= category or t.OwnerKey ~= ownerKey then
+                      table.insert(toClose, t)
+                  end
+              end
+              for _, t in ipairs(toClose) do closeTab(t) end
+              self_._activeCategory = category
+          end'''
+
+          new_enforce = '''    function self_:_EnforceSingleSidebarItem(category, ownerKey)
+              -- Sidebar pages are lazy-built once and then cached. Switching
+              -- groups only changes visibility, avoiding repeated component,
+              -- icon, layout and event construction on every click.
+              for _, t in ipairs(self_.Tabs) do
+                  local sameOwner = t.Category == category
+                      and t.OwnerKey == ownerKey
+
+                  if t._btn and t._btn.Parent then
+                      t._btn.Visible = sameOwner
+                  end
+
+                  if t._dividerBefore and t._dividerBefore.Parent then
+                      t._dividerBefore.Visible = false
+                  end
+
+                  local tabPage = rawget(t, "Page")
+                  if tabPage then
+                      tabPage.Visible = sameOwner and self_._activeTab == t
+                  end
+              end
+
+              self_._activeCategory = category
+              refreshDividers()
+          end'''
+
+          old_select = '''        for _, tab in ipairs(self_.Tabs) do
+              if tab.Name == name then
+                  selectTab(tab)
+                  return tab
+              end
+          end'''
+
+          new_select = '''        for _, tab in ipairs(self_.Tabs) do
+              if tab.Name == name then
+                  if tab.Category then
+                      self_:_EnforceSingleSidebarItem(
+                          tab.Category,
+                          tab.OwnerKey
+                      )
+                  end
+                  selectTab(tab)
+                  return tab
+              end
+          end'''
+
+          for path in files:
+              text = path.read_text(encoding='utf-8')
+
+              replacements = [
+                  ('refreshDividers', old_refresh, new_refresh),
+                  ('_EnforceSingleSidebarItem', old_enforce, new_enforce),
+                  ('SelectTab cached visibility', old_select, new_select),
+              ]
+
+              for label, old, new in replacements:
+                  count = text.count(old)
+                  if count != 1:
+                      raise SystemExit(
+                          f'{path}: expected exactly one {label} block, found {count}'
+                      )
+                  text = text.replace(old, new, 1)
+
+              path.write_text(text, encoding='utf-8')
+              print(f'patched {path}')
+          PY
+
+      - name: Remove one-time workflow
+        run: git rm .github/workflows/optimize-sidebar-tabs.yml
+
+      - name: Commit optimization
+        shell: bash
+        run: |
+          git config user.name "Mist Hub Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/03_window_settings.luau.part dist/MistUI.lua
+          git commit -m "perf: cache sidebar tabs instead of rebuilding"
+          git push
