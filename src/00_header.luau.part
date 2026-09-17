@@ -2,7 +2,7 @@
 --[[
     ============================================================
     MIST UI LIBRARY v4.0 STABLE
-    Executor-ready single-file distribution.
+    Runtime-ready single-file distribution.
     ============================================================
 
     Recommended modern API:
@@ -29,7 +29,7 @@
     Distribution policy:
       - one active Window per Library instance by design
       - load the raw file again if an independent second UI is required
-      - executor-specific storage is isolated behind StorageAdapter
+      - runtime-specific storage is isolated behind StorageAdapter
       - remote icon code is opt-in; internal icons always have local fallbacks
 
     Development type declarations, tests and documentation are shipped in the

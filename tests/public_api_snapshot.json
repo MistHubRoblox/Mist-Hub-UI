@@ -88,7 +88,7 @@
     "DismissLatestNotification",
     "DismissNotification",
     "GetDiagnostics",
-    "GetExecutorAdapter",
+    "GetRuntimeAdapter",
     "GetFlag",
     "GetFlags",
     "GetLatestNotificationId",

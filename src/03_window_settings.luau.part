@@ -2793,9 +2793,9 @@ function Library:CreateWindow(config)
         end
 
         local ok = false
-        local isFolderFn = getExecutorFunction("isfolder")
-        local makeFolderFn = getExecutorFunction("makefolder")
-        local writeFileFn = getExecutorFunction("writefile")
+        local isFolderFn = getRuntimeFunction("isfolder")
+        local makeFolderFn = getRuntimeFunction("makefolder")
+        local writeFileFn = getRuntimeFunction("writefile")
 
         if isFolderFn and makeFolderFn and writeFileFn then
             if not isFolderFn("MistHub") then pcall(makeFolderFn, "MistHub") end
@@ -2899,7 +2899,7 @@ function Library:CreateWindow(config)
 
     makeButton(shareButtons, "Copy", "secondary", 56, 30, function()
         local json = exportThemeJson()
-        local setClipboardFn = getExecutorFunction("setclipboard")
+        local setClipboardFn = getRuntimeFunction("setclipboard")
         if setClipboardFn then
             pcall(setClipboardFn, json)
             Library:Notify({ Title = "Appearance", Content = "Theme JSON copied.", Type = "Success" })
@@ -2909,7 +2909,7 @@ function Library:CreateWindow(config)
     end)
 
     makeButton(shareButtons, "Paste", "secondary", 58, 30, function()
-        local getClipboardFn = getExecutorFunction("getclipboard")
+        local getClipboardFn = getRuntimeFunction("getclipboard")
         if getClipboardFn then
             local ok, clipboard = pcall(getClipboardFn)
             if ok and clipboard then importThemeJson(clipboard) end
@@ -3279,7 +3279,7 @@ function Library:CreateWindow(config)
     )
 
     local function copySocialLink(kind, value)
-        local setClipboardFn = getExecutorFunction("setclipboard")
+        local setClipboardFn = getRuntimeFunction("setclipboard")
         if setClipboardFn then
             local ok = pcall(setClipboardFn, tostring(value))
             Library:Notify({
@@ -3315,14 +3315,14 @@ function Library:CreateWindow(config)
     Library.ConfigFolder = Library.ConfigFolder or "MistHub"
     Library.ConfigSubFolder = Library.ConfigSubFolder
 
-    local fsWriteFile = getExecutorFunction("writefile")
-    local fsReadFile = getExecutorFunction("readfile")
-    local fsIsFile = getExecutorFunction("isfile")
-    local fsDeleteFile = getExecutorFunction("delfile")
-        or getExecutorFunction("deletefile")
-    local fsMakeFolder = getExecutorFunction("makefolder")
-    local fsIsFolder = getExecutorFunction("isfolder")
-    local fsListFiles = getExecutorFunction("listfiles")
+    local fsWriteFile = getRuntimeFunction("writefile")
+    local fsReadFile = getRuntimeFunction("readfile")
+    local fsIsFile = getRuntimeFunction("isfile")
+    local fsDeleteFile = getRuntimeFunction("delfile")
+        or getRuntimeFunction("deletefile")
+    local fsMakeFolder = getRuntimeFunction("makefolder")
+    local fsIsFolder = getRuntimeFunction("isfolder")
+    local fsListFiles = getRuntimeFunction("listfiles")
 
     local function canUseFileAPI()
         return type(fsWriteFile) == "function"
@@ -7746,7 +7746,7 @@ function Library:CreateWindow(config)
         })
 
         -- Use an explicit width for top tabs. Nested AutomaticSize chains can resolve
-        -- to 0 px on some executor/Roblox builds, which makes tabs exist but render
+        -- to 0 px on some runtime/Roblox builds, which makes tabs exist but render
         -- invisibly. The width is deterministic and the strip scrolls horizontally.
         local visibleNameLength = utf8.len(name) or #name
         local tabWidth = math.clamp(52 + visibleNameLength * 8 + (iconBuilder and 20 or 0), 84, 220)
@@ -8745,7 +8745,7 @@ function Library:CreateWindow(config)
             "Storage",
             storageOk,
             storageOk and ("Storage adapter available: " .. Library:GetStorageAdapterName())
-                or "Persistent executor storage is unavailable in this runtime.",
+                or "Persistent runtime storage is unavailable in this runtime.",
             "warning"
         )
         add("Config schema", (Library.SchemaVersion or 0) == 5, "Config schema " .. tostring(Library.SchemaVersion) .. " (v4 keeps schema 5 for backward compatibility).", "error")

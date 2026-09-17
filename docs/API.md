@@ -244,7 +244,7 @@ Schema version remains **5** in v4.0 so existing v3 configs stay compatible.
 
 Persistence APIs include `SaveConfig`, `LoadConfig`, `DeleteConfig`, `GetConfigs`, `ConfigExists`, `GetConfigData`, `ApplyConfigData`, `SaveFlagsConfig`, `SetAutoload` and `GetAutoload`. Configs are stored as persistent files under `MistHub/settings`; JSON import/export UI is not part of the v4 config workflow.
 
-Executor filesystem access is isolated behind the storage adapter. `UseMemoryStorage = true` gives deterministic no-filesystem testing.
+Runtime filesystem access is isolated behind the storage adapter. `UseMemoryStorage = true` gives deterministic no-filesystem testing.
 
 ## Themes
 

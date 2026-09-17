@@ -50,7 +50,7 @@ visible = "\n".join(visible_lines).lower()
 
 for term in (
     "doctor", "profiler", "quality suite", "leak", "schema", "debug panel",
-    "file api", "storage adapter", "executor file api", "test lab",
+    "file api", "storage adapter", "runtime file api", "test lab",
 ):
     if term in visible:
         print(f"FAIL: internal/dev term is visible in normal Settings: {term!r}")

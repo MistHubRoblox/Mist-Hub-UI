@@ -20,7 +20,7 @@ Library.Capabilities = {
     GamepadNavigation = true,
     TouchTooltips = true,
     MemoryStorage = true,
-    ExecutorStorage = true,
+    RuntimeStorage = true,
     OverlayStack = true,
     ColorPicker = true,
     Viewport = true,
@@ -241,7 +241,7 @@ local function diagnosticCopy(value, seen)
     local robloxType = typeof(value)
 
     -- Diagnostics/default snapshots must never keep strong references to the UI
-    -- tree, callbacks, threads or executor userdata. Keep primitives as-is and
+    -- tree, callbacks, threads or runtime userdata. Keep primitives as-is and
     -- stringify opaque/runtime objects so debug tooling cannot become a leak.
     if robloxType == "Instance" then
         local ok, fullName = pcall(function() return value:GetFullName() end)
@@ -1509,7 +1509,7 @@ end
 ------------------------------------------------------------
 -- ÍCONES: Lucide real via lucide-roblox (latte-soft), com
 -- fallback vetorial DESENHADO (não uma bolinha genérica) caso
--- o HttpGet falhe (executor sem rede / domínio bloqueado).
+-- o HttpGet falhe (runtime sem rede / domínio bloqueado).
 -- https://github.com/latte-soft/lucide-roblox
 ------------------------------------------------------------
 Library.UseRemoteIcons = Library.UseRemoteIcons == true

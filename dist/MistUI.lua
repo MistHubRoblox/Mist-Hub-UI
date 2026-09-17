@@ -2,7 +2,7 @@
 --[[
     ============================================================
     MIST UI LIBRARY v4.0 STABLE
-    Executor-ready single-file distribution.
+    Runtime-ready single-file distribution.
     ============================================================
 
     Recommended modern API:
@@ -29,7 +29,7 @@
     Distribution policy:
       - one active Window per Library instance by design
       - load the raw file again if an independent second UI is required
-      - executor-specific storage is isolated behind StorageAdapter
+      - runtime-specific storage is isolated behind StorageAdapter
       - remote icon code is opt-in; internal icons always have local fallbacks
 
     Development type declarations, tests and documentation are shipped in the
@@ -59,7 +59,7 @@ Library.Capabilities = {
     GamepadNavigation = true,
     TouchTooltips = true,
     MemoryStorage = true,
-    ExecutorStorage = true,
+    RuntimeStorage = true,
     OverlayStack = true,
     ColorPicker = true,
     Viewport = true,
@@ -280,7 +280,7 @@ local function diagnosticCopy(value, seen)
     local robloxType = typeof(value)
 
     -- Diagnostics/default snapshots must never keep strong references to the UI
-    -- tree, callbacks, threads or executor userdata. Keep primitives as-is and
+    -- tree, callbacks, threads or runtime userdata. Keep primitives as-is and
     -- stringify opaque/runtime objects so debug tooling cannot become a leak.
     if robloxType == "Instance" then
         local ok, fullName = pcall(function() return value:GetFullName() end)
@@ -1548,7 +1548,7 @@ end
 ------------------------------------------------------------
 -- ÍCONES: Lucide real via lucide-roblox (latte-soft), com
 -- fallback vetorial DESENHADO (não uma bolinha genérica) caso
--- o HttpGet falhe (executor sem rede / domínio bloqueado).
+-- o HttpGet falhe (runtime sem rede / domínio bloqueado).
 -- https://github.com/latte-soft/lucide-roblox
 ------------------------------------------------------------
 Library.UseRemoteIcons = Library.UseRemoteIcons == true
@@ -2178,9 +2178,9 @@ local function getOverlaySurfaceColor()
 end
 
 ------------------------------------------------------------
--- EXECUTOR GLOBAL RESOLVER
+-- RUNTIME GLOBAL RESOLVER
 ------------------------------------------------------------
-local function collectExecutorEnvironments()
+local function collectRuntimeEnvironments()
     local environments = {}
     local seen = {}
 
@@ -2191,9 +2191,9 @@ local function collectExecutorEnvironments()
         end
     end
 
-    -- Executor APIs are commonly injected into the current/getgenv environment
+    -- Runtime APIs are commonly injected into the current/getgenv environment
     -- without also being copied into _G. Resolve those environments directly,
-    -- so executor globals remain available across supported environments.
+    -- so runtime globals remain available across supported environments.
     local okGenv, genv = pcall(function()
         if type(getgenv) == "function" then
             return getgenv()
@@ -2206,8 +2206,8 @@ local function collectExecutorEnvironments()
     return environments
 end
 
-local function getExecutorGlobal(name)
-    for _, env in ipairs(collectExecutorEnvironments()) do
+local function getRuntimeGlobal(name)
+    for _, env in ipairs(collectRuntimeEnvironments()) do
         local ok, value = pcall(function()
             return env[name]
         end)
@@ -2216,8 +2216,8 @@ local function getExecutorGlobal(name)
     return nil
 end
 
-local function getExecutorFunction(name)
-    local value = getExecutorGlobal(name)
+local function getRuntimeFunction(name)
+    local value = getRuntimeGlobal(name)
     if type(value) == "function" then
         return value
     end
@@ -2246,9 +2246,9 @@ local FILE_NAMESPACE_ALIASES = {
 
 local FILE_NAMESPACE_NAMES = { "filesystem", "fs", "FileSystem" }
 
-local function resolveExecutorFunction(aliases)
+local function resolveRuntimeFunction(aliases)
     for _, name in ipairs(aliases or {}) do
-        local fn = getExecutorFunction(name)
+        local fn = getRuntimeFunction(name)
         if fn then return fn, name end
     end
     return nil, nil
@@ -2271,11 +2271,11 @@ local function bindNamespaceFunction(namespace, fn)
 end
 
 local function resolveFilesystemFunction(kind)
-    local direct, directName = resolveExecutorFunction(FILE_API_ALIASES[kind])
+    local direct, directName = resolveRuntimeFunction(FILE_API_ALIASES[kind])
     if direct then return direct, directName end
 
     for _, namespaceName in ipairs(FILE_NAMESPACE_NAMES) do
-        local namespace = getExecutorGlobal(namespaceName)
+        local namespace = getRuntimeGlobal(namespaceName)
         if type(namespace) == "table" then
             for _, methodName in ipairs(FILE_NAMESPACE_ALIASES[kind] or {}) do
                 local fn = rawget(namespace, methodName)
@@ -2289,49 +2289,49 @@ local function resolveFilesystemFunction(kind)
     return nil, nil
 end
 
-Library.ExecutorAdapterClass = Library.ExecutorAdapterClass or {}
-Library.ExecutorAdapterClass.__index = Library.ExecutorAdapterClass
+Library.RuntimeAdapterClass = Library.RuntimeAdapterClass or {}
+Library.RuntimeAdapterClass.__index = Library.RuntimeAdapterClass
 
-function Library.ExecutorAdapterClass.new()
-    return setmetatable({}, Library.ExecutorAdapterClass)
+function Library.RuntimeAdapterClass.new()
+    return setmetatable({}, Library.RuntimeAdapterClass)
 end
 
-function Library.ExecutorAdapterClass:Get(name)
-    return getExecutorGlobal(name)
+function Library.RuntimeAdapterClass:Get(name)
+    return getRuntimeGlobal(name)
 end
 
-function Library.ExecutorAdapterClass:GetFunction(name)
-    return getExecutorFunction(name)
+function Library.RuntimeAdapterClass:GetFunction(name)
+    return getRuntimeFunction(name)
 end
 
-function Library.ExecutorAdapterClass:Has(name)
-    return getExecutorGlobal(name) ~= nil
+function Library.RuntimeAdapterClass:Has(name)
+    return getRuntimeGlobal(name) ~= nil
 end
 
-function Library.ExecutorAdapterClass:SetClipboard(value)
-    local fn = getExecutorFunction("setclipboard")
+function Library.RuntimeAdapterClass:SetClipboard(value)
+    local fn = getRuntimeFunction("setclipboard")
     if not fn then return false, "setclipboard is unavailable" end
     local ok, err = pcall(fn, tostring(value or ""))
     return ok, err
 end
 
-function Library.ExecutorAdapterClass:GetClipboard()
-    local fn = getExecutorFunction("getclipboard")
+function Library.RuntimeAdapterClass:GetClipboard()
+    local fn = getRuntimeFunction("getclipboard")
     if not fn then return false, "getclipboard is unavailable" end
     local ok, value = pcall(fn)
     return ok, value
 end
 
-Library.ExecutorAdapter = Library.ExecutorAdapter or Library.ExecutorAdapterClass.new()
+Library.RuntimeAdapter = Library.RuntimeAdapter or Library.RuntimeAdapterClass.new()
 
-function Library:GetExecutorAdapter()
-    return self.ExecutorAdapter
+function Library:GetRuntimeAdapter()
+    return self.RuntimeAdapter
 end
 
-local ExecutorStorageAdapter = {}
-ExecutorStorageAdapter.__index = ExecutorStorageAdapter
+local RuntimeStorageAdapter = {}
+RuntimeStorageAdapter.__index = RuntimeStorageAdapter
 
-function ExecutorStorageAdapter.new()
+function RuntimeStorageAdapter.new()
     local writeFile, writeSource = resolveFilesystemFunction("Write")
     local readFile, readSource = resolveFilesystemFunction("Read")
     local isFile = resolveFilesystemFunction("Exists")
@@ -2349,37 +2349,37 @@ function ExecutorStorageAdapter.new()
         IsFolder = isFolder,
         ListFiles = listFiles,
         APIName = writeSource or readSource or "Unavailable",
-    }, ExecutorStorageAdapter)
+    }, RuntimeStorageAdapter)
 end
 
-function ExecutorStorageAdapter:IsPersistent()
+function RuntimeStorageAdapter:IsPersistent()
     return self:IsAvailable()
 end
 
-function ExecutorStorageAdapter:SupportsDirectories()
+function RuntimeStorageAdapter:SupportsDirectories()
     return type(self.MakeFolder) == "function"
 end
 
-function ExecutorStorageAdapter:IsAvailable()
+function RuntimeStorageAdapter:IsAvailable()
     return type(self.WriteFile) == "function"
         and type(self.ReadFile) == "function"
 end
 
-function ExecutorStorageAdapter:Write(path, data)
+function RuntimeStorageAdapter:Write(path, data)
     if type(self.WriteFile) ~= "function" then
         error("writefile is unavailable")
     end
     return self.WriteFile(path, data)
 end
 
-function ExecutorStorageAdapter:Read(path)
+function RuntimeStorageAdapter:Read(path)
     if type(self.ReadFile) ~= "function" then
         error("readfile is unavailable")
     end
     return self.ReadFile(path)
 end
 
-function ExecutorStorageAdapter:Exists(path)
+function RuntimeStorageAdapter:Exists(path)
     if type(self.IsFile) == "function" then
         return self.IsFile(path)
     end
@@ -2390,28 +2390,28 @@ function ExecutorStorageAdapter:Exists(path)
     return false
 end
 
-function ExecutorStorageAdapter:Delete(path)
+function RuntimeStorageAdapter:Delete(path)
     if type(self.DeleteFile) == "function" then
         return self.DeleteFile(path)
     end
     return false
 end
 
-function ExecutorStorageAdapter:MakeDirectory(path)
+function RuntimeStorageAdapter:MakeDirectory(path)
     if type(self.MakeFolder) == "function" then
         return self.MakeFolder(path)
     end
     return false
 end
 
-function ExecutorStorageAdapter:IsDirectory(path)
+function RuntimeStorageAdapter:IsDirectory(path)
     if type(self.IsFolder) ~= "function" then
         return false
     end
     return self.IsFolder(path)
 end
 
-function ExecutorStorageAdapter:List(path)
+function RuntimeStorageAdapter:List(path)
     if type(self.ListFiles) ~= "function" then
         return {}
     end
@@ -2483,15 +2483,15 @@ function MemoryStorageAdapter:List(path)
 end
 
 Library.StorageAdapters = {
-    Executor = ExecutorStorageAdapter,
+    Runtime = RuntimeStorageAdapter,
     Memory = MemoryStorageAdapter,
 }
 
 do
     if Library.StorageAdapter == nil then
-        Library.StorageAdapter = ExecutorStorageAdapter.new()
+        Library.StorageAdapter = RuntimeStorageAdapter.new()
         if not Library.StorageAdapter:IsAvailable() then
-            Library.StorageFallbackReason = "No persistent executor filesystem API was detected"
+            Library.StorageFallbackReason = "No persistent runtime filesystem API was detected"
         end
     end
 end
@@ -2507,9 +2507,9 @@ end
 
 function Library:GetStorageAdapter()
     if not self.StorageAdapter then
-        self.StorageAdapter = ExecutorStorageAdapter.new()
+        self.StorageAdapter = RuntimeStorageAdapter.new()
         if not self.StorageAdapter:IsAvailable() then
-            self.StorageFallbackReason = "No persistent executor filesystem API was detected"
+            self.StorageFallbackReason = "No persistent runtime filesystem API was detected"
         end
     end
     return self.StorageAdapter
@@ -2523,7 +2523,7 @@ end
 
 function Library:IsPersistentStorage()
     local adapter = self:GetStorageAdapter()
-    if getmetatable(adapter) == ExecutorStorageAdapter then
+    if getmetatable(adapter) == RuntimeStorageAdapter then
         return adapter:IsAvailable()
     end
     if type(adapter.IsPersistent) == "function" then
@@ -2546,11 +2546,11 @@ function Library:GetStorageAdapterName()
     if getmetatable(adapter) == MemoryStorageAdapter then
         return "Memory"
     end
-    if getmetatable(adapter) == ExecutorStorageAdapter then
+    if getmetatable(adapter) == RuntimeStorageAdapter then
         if adapter:IsAvailable() and adapter.APIName and adapter.APIName ~= "Unavailable" then
-            return "Executor · " .. tostring(adapter.APIName)
+            return "Runtime · " .. tostring(adapter.APIName)
         end
-        return "Executor"
+        return "Runtime"
     end
     return "Custom"
 end
@@ -5350,9 +5350,9 @@ function Library:CreateWindow(config)
         end
 
         local ok = false
-        local isFolderFn = getExecutorFunction("isfolder")
-        local makeFolderFn = getExecutorFunction("makefolder")
-        local writeFileFn = getExecutorFunction("writefile")
+        local isFolderFn = getRuntimeFunction("isfolder")
+        local makeFolderFn = getRuntimeFunction("makefolder")
+        local writeFileFn = getRuntimeFunction("writefile")
 
         if isFolderFn and makeFolderFn and writeFileFn then
             if not isFolderFn("MistHub") then pcall(makeFolderFn, "MistHub") end
@@ -5456,7 +5456,7 @@ function Library:CreateWindow(config)
 
     makeButton(shareButtons, "Copy", "secondary", 56, 30, function()
         local json = exportThemeJson()
-        local setClipboardFn = getExecutorFunction("setclipboard")
+        local setClipboardFn = getRuntimeFunction("setclipboard")
         if setClipboardFn then
             pcall(setClipboardFn, json)
             Library:Notify({ Title = "Appearance", Content = "Theme JSON copied.", Type = "Success" })
@@ -5466,7 +5466,7 @@ function Library:CreateWindow(config)
     end)
 
     makeButton(shareButtons, "Paste", "secondary", 58, 30, function()
-        local getClipboardFn = getExecutorFunction("getclipboard")
+        local getClipboardFn = getRuntimeFunction("getclipboard")
         if getClipboardFn then
             local ok, clipboard = pcall(getClipboardFn)
             if ok and clipboard then importThemeJson(clipboard) end
@@ -5836,7 +5836,7 @@ function Library:CreateWindow(config)
     )
 
     local function copySocialLink(kind, value)
-        local setClipboardFn = getExecutorFunction("setclipboard")
+        local setClipboardFn = getRuntimeFunction("setclipboard")
         if setClipboardFn then
             local ok = pcall(setClipboardFn, tostring(value))
             Library:Notify({
@@ -5872,14 +5872,14 @@ function Library:CreateWindow(config)
     Library.ConfigFolder = Library.ConfigFolder or "MistHub"
     Library.ConfigSubFolder = Library.ConfigSubFolder
 
-    local fsWriteFile = getExecutorFunction("writefile")
-    local fsReadFile = getExecutorFunction("readfile")
-    local fsIsFile = getExecutorFunction("isfile")
-    local fsDeleteFile = getExecutorFunction("delfile")
-        or getExecutorFunction("deletefile")
-    local fsMakeFolder = getExecutorFunction("makefolder")
-    local fsIsFolder = getExecutorFunction("isfolder")
-    local fsListFiles = getExecutorFunction("listfiles")
+    local fsWriteFile = getRuntimeFunction("writefile")
+    local fsReadFile = getRuntimeFunction("readfile")
+    local fsIsFile = getRuntimeFunction("isfile")
+    local fsDeleteFile = getRuntimeFunction("delfile")
+        or getRuntimeFunction("deletefile")
+    local fsMakeFolder = getRuntimeFunction("makefolder")
+    local fsIsFolder = getRuntimeFunction("isfolder")
+    local fsListFiles = getRuntimeFunction("listfiles")
 
     local function canUseFileAPI()
         return type(fsWriteFile) == "function"
@@ -10303,7 +10303,7 @@ function Library:CreateWindow(config)
         })
 
         -- Use an explicit width for top tabs. Nested AutomaticSize chains can resolve
-        -- to 0 px on some executor/Roblox builds, which makes tabs exist but render
+        -- to 0 px on some runtime/Roblox builds, which makes tabs exist but render
         -- invisibly. The width is deterministic and the strip scrolls horizontally.
         local visibleNameLength = utf8.len(name) or #name
         local tabWidth = math.clamp(52 + visibleNameLength * 8 + (iconBuilder and 20 or 0), 84, 220)
@@ -11302,7 +11302,7 @@ function Library:CreateWindow(config)
             "Storage",
             storageOk,
             storageOk and ("Storage adapter available: " .. Library:GetStorageAdapterName())
-                or "Persistent executor storage is unavailable in this runtime.",
+                or "Persistent runtime storage is unavailable in this runtime.",
             "warning"
         )
         add("Config schema", (Library.SchemaVersion or 0) == 5, "Config schema " .. tostring(Library.SchemaVersion) .. " (v4 keeps schema 5 for backward compatibility).", "error")

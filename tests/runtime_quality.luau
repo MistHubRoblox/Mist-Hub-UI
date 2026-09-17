@@ -1,5 +1,5 @@
 -- MistUI v4 runtime quality suite.
--- Run inside a target Roblox/executor runtime. This file is not executed by GitHub CI.
+-- Run inside a target Roblox/runtime runtime. This file is not executed by GitHub CI.
 
 local RAW_URL = "PASTE_YOUR_RAW_GITHUB_URL_HERE"
 local env = getgenv and getgenv() or _G

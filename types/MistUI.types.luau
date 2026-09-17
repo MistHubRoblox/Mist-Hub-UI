@@ -1,6 +1,6 @@
 --!strict
 -- MistUI v4.0 Stable public declarations.
--- The executor distribution stays --!nocheck for broad executor compatibility;
+-- The runtime distribution stays --!nocheck for broad runtime compatibility;
 -- consumers can use this file as the development-facing API contract.
 
 export type Connection = {
@@ -812,7 +812,7 @@ export type Library = {
     RefreshNotificationTheme: (self: Library) -> boolean,
     LoadRemoteIcons: (self: Library) -> boolean,
     SetRemoteIconsEnabled: (self: Library, enabled: boolean) -> boolean,
-    GetExecutorAdapter: (self: Library) -> any,
+    GetRuntimeAdapter: (self: Library) -> any,
     SetStorageAdapter: (self: Library, adapter: any) -> boolean,
     GetStorageAdapter: (self: Library) -> any,
     GetStorageAdapterName: (self: Library) -> string,

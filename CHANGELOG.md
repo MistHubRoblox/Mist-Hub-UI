@@ -39,7 +39,7 @@
 - Settings dropdowns now render through a dedicated overlay layer so menus are not clipped by scrolling pages or section bounds.
 - Removed the title-bar Keybinds icon; the floating keybind list is controlled from Settings > Interface.
 - Active keybinds are visually highlighted; inactive keybinds remain gray.
-- Config storage no longer silently falls back to volatile session memory. Persistent storage now requires a durable executor storage API.
+- Config storage no longer silently falls back to volatile session memory. Persistent storage now requires a durable runtime storage API.
 - Added broader persistent filesystem API detection, including common aliases/namespaces and flat-file fallback when folder APIs are unavailable.
 # ColorPicker / Popover hotfix
 
@@ -54,7 +54,7 @@
 ## 4.0.0-fix1 — Luau scope/lint correction
 
 - fixed 28 out-of-scope `self_` references inside `Library:_AttachCardAPI`; the window receiver is `self` in that method
-- made executor storage `Delete` / `MakeDirectory` return `false` when unsupported
+- made runtime storage `Delete` / `MakeDirectory` return `false` when unsupported
 - removed an unused `empty` local in the keybind menu
 - no v4 feature was removed
 
@@ -127,10 +127,10 @@
 - Fixed malformed multiline CodeBox sample in the standalone Test Lab.
 ## v4 config storage fallback hotfix
 
-- Automatically falls back to Memory Storage when executor readfile/writefile are unavailable.
+- Automatically falls back to Memory Storage when runtime readfile/writefile are unavailable.
 - Create/Save/Load/Import/Export continue working for the current session without File API.
 - Configuration Settings now shows whether storage is persistent or session-only.
-- Hardened ExecutorStorageAdapter against missing readfile/writefile functions.
+- Hardened RuntimeStorageAdapter against missing readfile/writefile functions.
 
 
 ## Config persistence rebuild
@@ -138,7 +138,7 @@
 - Configs now live under `MistHub/settings/<name>.json`.
 - Config discovery uses `listfiles()`; no `config_index.json` is used.
 - Autoload is stored at `MistHub/settings/autoload.txt`.
-- File operations use the executor's standard `writefile/readfile/isfile/isfolder/makefolder/listfiles/delfile` APIs.
+- File operations use the runtime's standard `writefile/readfile/isfile/isfolder/makefolder/listfiles/delfile` APIs.
 - Removed Import Config / Export Config JSON from the Settings UI and public Window API.
 - Removed memory/session-only storage as a config fallback.
 

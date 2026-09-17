@@ -3,7 +3,7 @@
 MistUI is a Roblox/Luau UI framework built for two equal-quality distribution targets:
 
 - **GitHub/source package** — modular build fragments, strict public types, docs, examples, audits and CI.
-- **Executor/library build** — one self-contained `dist/MistUI.lua` file with no demo/application bootstrap.
+- **Runtime/library build** — one self-contained `dist/MistUI.lua` file with no demo/application bootstrap.
 
 The release is a **pure library**: loading it returns `Library`; it does not create a window until `CreateWindow` is called.
 
@@ -24,7 +24,7 @@ v3.1 closed the major feature/API gaps identified during earlier framework revie
 Highlights:
 
 - integrated `Signal` / `Maid` / `Store` / flag observation architecture
-- deterministic config serialization, schema migration and persistent executor-file autoload/config storage; a memory adapter remains available only for custom/testing use
+- deterministic config serialization, schema migration and persistent runtime-file autoload/config storage; a memory adapter remains available only for custom/testing use
 - stable component IDs and lazy-page-safe declarative keybind registration
 - keybind modes `Toggle`, `Hold`, `Press`, `Always`, plus modifier chords and mouse buttons
 - `Input`, `DropdownEx`, `MultiDropdown`, `ColorPicker`, `Viewport`, `Video`, `UIPassthrough`
@@ -43,7 +43,7 @@ Highlights:
 - stable API regression snapshot + deterministic build/checksum validation in CI
 - virtualized `DropdownEx`/`MultiDropdown`/`AddList` rows for large option sets; command palette output is capped and `CreateVirtualList` remains pooled
 - remote icons are optional; every MistUI-internal icon has a local fallback
-- strict development types without sacrificing broad executor compatibility in `dist/`
+- strict development types without sacrificing broad runtime compatibility in `dist/`
 
 ## Recommended API
 
@@ -124,11 +124,11 @@ python tests/quality_contract.py
 python tools/release.py --check
 ```
 
-`tests/runtime_smoke.luau`, `tests/runtime_quality.luau`, `tests/runtime_stress.luau` and `tests/runtime_benchmark.luau` are Roblox/executor runtime suites. They are not claimed as passed until actually executed in a target runtime.
+`tests/runtime_smoke.luau`, `tests/runtime_quality.luau`, `tests/runtime_stress.luau` and `tests/runtime_benchmark.luau` are Roblox/runtime runtime suites. They are not claimed as passed until actually executed in a target runtime.
 
-## Executor compatibility
+## Runtime compatibility
 
-`dist/MistUI.lua` intentionally uses `--!nocheck`: executor analyzers vary and commonly report false positives around dynamic Luau/executor APIs. The source package still ships a strict public API contract in `types/MistUI.types.luau`.
+`dist/MistUI.lua` intentionally uses `--!nocheck`: runtime analyzers vary and commonly report false positives around dynamic Luau/runtime APIs. The source package still ships a strict public API contract in `types/MistUI.types.luau`.
 
 ## Publishing
 
@@ -153,7 +153,7 @@ Window:OpenDebugPanel()
 
 `Doctor` is diagnostic, not a substitute for target-runtime testing.
 ### Persistence behavior
-MistUI configs are intended to be persistent. The library detects common executor filesystem APIs and uses flat files when directory creation is unavailable. If the runtime exposes no durable storage API at all, MistUI reports persistence as unavailable instead of pretending in-memory storage is permanent. A custom persistent `StorageAdapter` can also be supplied.
+MistUI configs are intended to be persistent. The library detects common runtime filesystem APIs and uses flat files when directory creation is unavailable. If the runtime exposes no durable storage API at all, MistUI reports persistence as unavailable instead of pretending in-memory storage is permanent. A custom persistent `StorageAdapter` can also be supplied.
 
 
 ### Config persistence
