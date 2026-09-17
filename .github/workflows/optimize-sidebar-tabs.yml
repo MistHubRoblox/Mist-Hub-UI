@@ -22,122 +22,114 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           files = [
               Path('src/03_window_settings.luau.part'),
               Path('dist/MistUI.lua'),
           ]
 
-          old_refresh = '''    local function refreshDividers()
-              if #self_.Tabs == 0 then return end
-              local minOrder = math.huge
-              for _, t in ipairs(self_.Tabs) do
-                  if t._order and t._order < minOrder then minOrder = t._order end
-              end
-              for _, t in ipairs(self_.Tabs) do
-                  if t._dividerBefore then
-                      t._dividerBefore.Visible = (t._order ~= minOrder)
-                  end
-              end
-          end'''
+          new_refresh = "\n".join([
+              "    local function refreshDividers()",
+              "        local minOrder = math.huge",
+              "        local visibleCount = 0",
+              "",
+              "        for _, t in ipairs(self_.Tabs) do",
+              "            local visible = t._btn and t._btn.Visible == true",
+              "            if visible then",
+              "                visibleCount += 1",
+              "                if t._order and t._order < minOrder then",
+              "                    minOrder = t._order",
+              "                end",
+              "            end",
+              "        end",
+              "",
+              "        for _, t in ipairs(self_.Tabs) do",
+              "            if t._dividerBefore then",
+              "                local visible = t._btn and t._btn.Visible == true",
+              "                t._dividerBefore.Visible = visible",
+              "                    and visibleCount > 1",
+              "                    and t._order ~= minOrder",
+              "            end",
+              "        end",
+              "    end",
+              "    self_._refreshDividers = refreshDividers",
+          ])
 
-          new_refresh = '''    local function refreshDividers()
-              local minOrder = math.huge
-              local visibleCount = 0
+          new_enforce = "\n".join([
+              "    function self_:_EnforceSingleSidebarItem(category, ownerKey)",
+              "        -- Sidebar pages are lazy-built once and then cached. Switching",
+              "        -- groups only changes visibility, avoiding repeated component,",
+              "        -- icon, layout and event construction on every click.",
+              "        for _, t in ipairs(self_.Tabs) do",
+              "            local sameOwner = t.Category == category",
+              "                and t.OwnerKey == ownerKey",
+              "",
+              "            if t._btn and t._btn.Parent then",
+              "                t._btn.Visible = sameOwner",
+              "            end",
+              "",
+              "            if t._dividerBefore and t._dividerBefore.Parent then",
+              "                t._dividerBefore.Visible = false",
+              "            end",
+              "",
+              "            local tabPage = rawget(t, \"Page\")",
+              "            if tabPage then",
+              "                tabPage.Visible = sameOwner and self_._activeTab == t",
+              "            end",
+              "        end",
+              "",
+              "        self_._activeCategory = category",
+              "        refreshDividers()",
+              "    end",
+          ])
 
-              for _, t in ipairs(self_.Tabs) do
-                  local visible = t._btn and t._btn.Visible == true
-                  if visible then
-                      visibleCount += 1
-                      if t._order and t._order < minOrder then
-                          minOrder = t._order
-                      end
-                  end
-              end
+          old_select = "\n".join([
+              "        for _, tab in ipairs(self_.Tabs) do",
+              "            if tab.Name == name then",
+              "                selectTab(tab)",
+              "                return tab",
+              "            end",
+              "        end",
+          ])
 
-              for _, t in ipairs(self_.Tabs) do
-                  if t._dividerBefore then
-                      local visible = t._btn and t._btn.Visible == true
-                      t._dividerBefore.Visible = visible
-                          and visibleCount > 1
-                          and t._order ~= minOrder
-                  end
-              end
-          end'''
+          new_select = "\n".join([
+              "        for _, tab in ipairs(self_.Tabs) do",
+              "            if tab.Name == name then",
+              "                if tab.Category then",
+              "                    self_:_EnforceSingleSidebarItem(",
+              "                        tab.Category,",
+              "                        tab.OwnerKey",
+              "                    )",
+              "                end",
+              "                selectTab(tab)",
+              "                return tab",
+              "            end",
+              "        end",
+          ])
 
-          old_enforce = '''    function self_:_EnforceSingleSidebarItem(category, ownerKey)
-              local toClose = {}
-              for _, t in ipairs(self_.Tabs) do
-                  if t.Category ~= category or t.OwnerKey ~= ownerKey then
-                      table.insert(toClose, t)
-                  end
-              end
-              for _, t in ipairs(toClose) do closeTab(t) end
-              self_._activeCategory = category
-          end'''
-
-          new_enforce = '''    function self_:_EnforceSingleSidebarItem(category, ownerKey)
-              -- Sidebar pages are lazy-built once and then cached. Switching
-              -- groups only changes visibility, avoiding repeated component,
-              -- icon, layout and event construction on every click.
-              for _, t in ipairs(self_.Tabs) do
-                  local sameOwner = t.Category == category
-                      and t.OwnerKey == ownerKey
-
-                  if t._btn and t._btn.Parent then
-                      t._btn.Visible = sameOwner
-                  end
-
-                  if t._dividerBefore and t._dividerBefore.Parent then
-                      t._dividerBefore.Visible = false
-                  end
-
-                  local tabPage = rawget(t, "Page")
-                  if tabPage then
-                      tabPage.Visible = sameOwner and self_._activeTab == t
-                  end
-              end
-
-              self_._activeCategory = category
-              refreshDividers()
-          end'''
-
-          old_select = '''        for _, tab in ipairs(self_.Tabs) do
-              if tab.Name == name then
-                  selectTab(tab)
-                  return tab
-              end
-          end'''
-
-          new_select = '''        for _, tab in ipairs(self_.Tabs) do
-              if tab.Name == name then
-                  if tab.Category then
-                      self_:_EnforceSingleSidebarItem(
-                          tab.Category,
-                          tab.OwnerKey
-                      )
-                  end
-                  selectTab(tab)
-                  return tab
-              end
-          end'''
+          refresh_pattern = re.compile(
+              r'(?ms)^    local function refreshDividers\(\)\n.*?^    end\n    self_\._refreshDividers = refreshDividers'
+          )
+          enforce_pattern = re.compile(
+              r'(?ms)^    function self_:_EnforceSingleSidebarItem\(category, ownerKey\)\n.*?^    end(?=\n\n    -- Creates \(or focuses\) a tab from a sidebar item\.)'
+          )
 
           for path in files:
               text = path.read_text(encoding='utf-8')
 
-              replacements = [
-                  ('refreshDividers', old_refresh, new_refresh),
-                  ('_EnforceSingleSidebarItem', old_enforce, new_enforce),
-                  ('SelectTab cached visibility', old_select, new_select),
-              ]
+              text, count = refresh_pattern.subn(new_refresh, text, count=1)
+              if count != 1:
+                  raise SystemExit(f'{path}: refreshDividers patch found {count} matches')
 
-              for label, old, new in replacements:
-                  count = text.count(old)
-                  if count != 1:
-                      raise SystemExit(
-                          f'{path}: expected exactly one {label} block, found {count}'
-                      )
-                  text = text.replace(old, new, 1)
+              text, count = enforce_pattern.subn(new_enforce, text, count=1)
+              if count != 1:
+                  raise SystemExit(f'{path}: _EnforceSingleSidebarItem patch found {count} matches')
+
+              count = text.count(old_select)
+              if count != 1:
+                  raise SystemExit(f'{path}: SelectTab patch found {count} matches')
+              text = text.replace(old_select, new_select, 1)
 
               path.write_text(text, encoding='utf-8')
               print(f'patched {path}')
