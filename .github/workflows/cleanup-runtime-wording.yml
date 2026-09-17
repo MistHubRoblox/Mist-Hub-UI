@@ -1,0 +1,85 @@
+name: Clean runtime wording
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/cleanup-runtime-wording.yml
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Remove exploit-specific wording while preserving the UI
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          skip = Path('.github/workflows/cleanup-runtime-wording.yml')
+          allowed = {'.lua', '.luau', '.part', '.md', '.txt', '.json', '.py', '.yml', '.yaml'}
+          replacements = (
+              ('EXECUTOR', 'RUNTIME'),
+              ('Executor', 'Runtime'),
+              ('executor', 'runtime'),
+              ('EXPLOIT', 'RUNTIME'),
+              ('Exploit', 'Runtime'),
+              ('exploit', 'runtime'),
+          )
+
+          changed = []
+          for path in Path('.').rglob('*'):
+              if not path.is_file() or path == skip or '.git' in path.parts:
+                  continue
+              if path.suffix.lower() not in allowed:
+                  continue
+              try:
+                  text = path.read_text(encoding='utf-8')
+              except UnicodeDecodeError:
+                  continue
+              updated = text
+              for old, new in replacements:
+                  updated = updated.replace(old, new)
+              if updated != text:
+                  path.write_text(updated, encoding='utf-8')
+                  changed.append(str(path))
+
+          print('Updated files:')
+          for path in changed:
+              print(' -', path)
+          PY
+
+      - name: Rebuild distribution
+        run: python tools/build.py
+
+      - name: Validate
+        shell: bash
+        run: |
+          python tools/build.py --check
+          python tests/static_audit.py
+          python tests/quality_contract.py
+          if grep -RniE 'executor|exploit' . \
+            --exclude-dir=.git \
+            --exclude=cleanup-runtime-wording.yml; then
+            echo 'Found remaining exploit-specific wording.'
+            exit 1
+          fi
+
+      - name: Remove one-time workflow
+        run: git rm .github/workflows/cleanup-runtime-wording.yml
+
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          git config user.name "Mist Hub Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: remove exploit-specific wording"
+          git push
