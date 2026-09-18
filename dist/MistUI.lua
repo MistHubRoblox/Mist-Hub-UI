@@ -19365,7 +19365,9 @@ function Library:Notify(config)
     end
 
     local notifType = config.Type or "Info"
-    local color = getNotifColor(notifType)
+    local color = typeof(config.Color) == "Color3"
+        and config.Color
+        or getNotifColor(notifType)
     local duration = math.max(0.1, tonumber(config.Duration) or tonumber(settings.Duration) or 4)
     local priority = tonumber(config.Priority) or 0
     local notifId = tostring(config.Id or ("notif_" .. tostring(math.floor(os.clock()*100000)) .. "_" .. tostring(math.random(1000,9999))))
