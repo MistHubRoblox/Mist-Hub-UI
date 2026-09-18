@@ -2722,8 +2722,8 @@ function Library:CreateWindow(config)
         Enabled = true,
         ProgressBar = true,
         Position = "TOP RIGHT",
-        Duration = 4,
-        MaxVisible = 4,
+        Duration = 10,
+        MaxVisible = 10,
         PauseOnHover = true,
     }
 
@@ -5790,7 +5790,7 @@ function Library:CreateWindow(config)
         "Duration",
         "Default notification lifetime.",
         { "2s", "3s", "4s", "5s", "6s", "8s", "10s" },
-        tostring(Library.NotificationSettings.Duration or 4) .. "s",
+        tostring(Library.NotificationSettings.Duration or 10) .. "s",
         function(value)
             local duration = tonumber(
                 tostring(value):gsub("s", "")
@@ -5805,13 +5805,13 @@ function Library:CreateWindow(config)
         notificationSection,
         "Max visible",
         "Maximum number of notifications visible together.",
-        { "1", "2", "3", "4", "5", "6", "7", "8" },
-        tostring(Library.NotificationSettings.MaxVisible or 4),
+        { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" },
+        tostring(Library.NotificationSettings.MaxVisible or 10),
         function(value)
             local amount = tonumber(value)
             if amount then
                 Library.NotificationSettings.MaxVisible =
-                    math.clamp(math.floor(amount), 1, 8)
+                    math.clamp(math.floor(amount), 1, 10)
             end
         end
     )
@@ -19315,8 +19315,8 @@ function Library:Notify(config)
         Enabled = true,
         ProgressBar = true,
         Position = "TOP RIGHT",
-        Duration = 4,
-        MaxVisible = 4,
+        Duration = 10,
+        MaxVisible = 10,
         PauseOnHover = true,
     }
 
@@ -19348,7 +19348,7 @@ function Library:Notify(config)
     local holder = ensureNotifHolder(self._screenGui)
     applyNotifHolderLayout(holder)
 
-    local maxVisible = math.max(1, tonumber(settings.MaxVisible) or 4)
+    local maxVisible = math.max(1, tonumber(settings.MaxVisible) or 10)
     local existing = {}
     for _, child in ipairs(holder:GetChildren()) do
         if child:IsA("Frame") or child:IsA("CanvasGroup") then
@@ -19374,7 +19374,7 @@ function Library:Notify(config)
     local color = typeof(config.Color) == "Color3"
         and config.Color
         or getNotifColor(notifType)
-    local duration = math.max(0.1, tonumber(config.Duration) or tonumber(settings.Duration) or 4)
+    local duration = math.max(0.1, tonumber(config.Duration) or tonumber(settings.Duration) or 10)
     local priority = tonumber(config.Priority) or 0
     local notifId = tostring(config.Id or ("notif_" .. tostring(math.floor(os.clock()*100000)) .. "_" .. tostring(math.random(1000,9999))))
     local hasAction = type(config.OnAction) == "function"
@@ -19781,8 +19781,8 @@ function Library:SetNotificationSettings(settings)
         Enabled = true,
         ProgressBar = true,
         Position = "TOP RIGHT",
-        Duration = 4,
-        MaxVisible = 4,
+        Duration = 10,
+        MaxVisible = 10,
         PauseOnHover = true,
     }
 
