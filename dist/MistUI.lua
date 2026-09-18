@@ -7345,15 +7345,21 @@ function Library:CreateWindow(config)
     -- Highlights the sidebar item for the active tab
     -- (visual feedback for the currently open tab): barra de destaque à
     -- esquerda, fundo levemente tintado, ícone e texto na cor de destaque.
-    local function highlightActiveItem(activeName)
+    local function highlightActiveItem(activeName, activeOwner)
         for _, cat in ipairs(self_.Categories) do
             for _, item in ipairs(cat._items) do
                 local isActive = false
                 if activeName ~= nil then
-                    for _, n in ipairs(item._matchNames or {}) do
-                        if n == activeName then
-                            isActive = true
-                            break
+                    local ownerMatches =
+                        activeOwner == nil
+                        or tostring(item._name or "") == tostring(activeOwner)
+
+                    if ownerMatches then
+                        for _, n in ipairs(item._matchNames or {}) do
+                            if n == activeName then
+                                isActive = true
+                                break
+                            end
                         end
                     end
                 end
@@ -7402,7 +7408,7 @@ function Library:CreateWindow(config)
         tween(tab._underline, { BackgroundTransparency = 0 }, 0.12)
         tween(tab._label, { TextColor3 = Theme.Text }, 0.12)
         self_._activeTab = tab
-        highlightActiveItem(tab.Name)
+        highlightActiveItem(tab.Name, tab.OwnerKey)
     end
     self_._selectTab = selectTab
 
