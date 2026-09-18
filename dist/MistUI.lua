@@ -19413,7 +19413,7 @@ function Library:Notify(config)
         ZIndex = 53,
         Parent = iconBubble,
     })
-    local notifIcon = buildIcon(notifIconHolder, NOTIF_ICONS[notifType] or "info", 18, color)
+    local notifIcon = buildIcon(notifIconHolder, tostring(config.Icon or NOTIF_ICONS[notifType] or "info"), 18, color)
 
     local titleLabel = create("TextLabel", {
         Name = "Title",
