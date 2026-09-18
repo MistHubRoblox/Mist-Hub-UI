@@ -2729,7 +2729,6 @@ function Library:CreateWindow(config)
 
     Library.InterfaceSettings = Library.InterfaceSettings or {
         SilentLaunch = false,
-        SilentMode = false,
         FunctionInfo = true,
     }
 
@@ -5654,16 +5653,6 @@ function Library:CreateWindow(config)
         end
     )
 
-    local silentModeToggle = settingsToggleRow(
-        interfaceSection,
-        "Silent mode",
-        "Hides the notifications from the script.",
-        Library.InterfaceSettings.SilentMode == true,
-        function(value)
-            Library.InterfaceSettings.SilentMode = value == true
-        end
-    )
-
     self_._motionSection = settingsSection(
         interfacePage,
         "Accessibility & Motion",
@@ -6461,7 +6450,6 @@ function Library:CreateWindow(config)
             Interface = {
                 MinimizeKey = minimizeKey and minimizeKey.Name or "NONE",
                 SilentLaunch = Library.InterfaceSettings.SilentLaunch == true,
-                SilentMode = Library.InterfaceSettings.SilentMode == true,
                 FunctionInfo = Library.InterfaceSettings.FunctionInfo ~= false,
                 ReducedMotion = Library.AnimationSettings.ReducedMotion == true,
                 AnimationSpeed = Library.AnimationSettings.Speed or 1,
@@ -6526,10 +6514,6 @@ function Library:CreateWindow(config)
             if interfaceData.SilentLaunch ~= nil then
                 Library.InterfaceSettings.SilentLaunch = interfaceData.SilentLaunch == true
                 silentLaunchToggle.Set(Library.InterfaceSettings.SilentLaunch)
-            end
-            if interfaceData.SilentMode ~= nil then
-                Library.InterfaceSettings.SilentMode = interfaceData.SilentMode == true
-                silentModeToggle.Set(Library.InterfaceSettings.SilentMode)
             end
             if interfaceData.FunctionInfo ~= nil then
                 setFunctionInfoEnabled(interfaceData.FunctionInfo ~= false)
@@ -19320,9 +19304,6 @@ function Library:Notify(config)
         PauseOnHover = true,
     }
 
-    if Library.InterfaceSettings and Library.InterfaceSettings.SilentMode and not config.Force then
-        return
-    end
     if settings.Enabled == false and not config.Force then
         return
     end
