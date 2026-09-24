@@ -2635,6 +2635,9 @@ function Library:CreateWindow(config)
     self_._restoreSize = nil
     self_._restorePosition = nil
     self_._baseSize = Vector2.new(size.X.Offset > 0 and size.X.Offset or 980, size.Y.Offset > 0 and size.Y.Offset or 660)
+    self_._uiScale = 1        -- effective scale actually applied
+    self_._userScale = 1      -- user multiplier (SetScale / config)
+    self_._minScale = tonumber(config.MinScale) or 0.4
     Library._activeWindow = self_
 
     local dragController = DragController.new(self_._maid)
@@ -2762,6 +2765,7 @@ function Library:CreateWindow(config)
     })
 
     Library:BindTheme(iconTooltip, "BackgroundColor3", "CardHover")
+    self_._tooltipScale = create("UIScale", { Name = "MistUIScale", Scale = 1, Parent = iconTooltip })
     for _, child in ipairs(iconTooltip:GetChildren()) do
         if child:IsA("UIStroke") then
             Library:BindTheme(child, "Color", "Accent")
@@ -3481,7 +3485,7 @@ function Library:CreateWindow(config)
             -- to the interface instead of popping in/out abruptly.
             keybindMenu.Position = keybindMenuRestPosition + UDim2.new(0, -8, 0, 6)
             keybindMenu.GroupTransparency = 1
-            keybindMenuScale.Scale = 0.94
+            keybindMenuScale.Scale = 0.94 * (self_._uiScale or 1)
             keybindMenu.Visible = true
 
             tween(
@@ -3496,7 +3500,7 @@ function Library:CreateWindow(config)
             )
             tween(
                 keybindMenuScale,
-                { Scale = 1 },
+                { Scale = self_._uiScale or 1 },
                 0.20,
                 Enum.EasingStyle.Quint,
                 Enum.EasingDirection.Out
@@ -3519,7 +3523,7 @@ function Library:CreateWindow(config)
             )
             tween(
                 keybindMenuScale,
-                { Scale = 0.94 },
+                { Scale = 0.94 * (self_._uiScale or 1) },
                 0.18,
                 Enum.EasingStyle.Quint,
                 Enum.EasingDirection.In
@@ -3531,7 +3535,7 @@ function Library:CreateWindow(config)
                     keybindMenu.Visible = false
                     keybindMenu.Position = keybindMenuRestPosition
                     keybindMenu.GroupTransparency = 0
-                    keybindMenuScale.Scale = 1
+                    keybindMenuScale.Scale = self_._uiScale or 1
                 end
             end)
         end
@@ -6476,7 +6480,7 @@ function Library:CreateWindow(config)
                     YScale = main.Size.Y.Scale,
                     YOffset = main.Size.Y.Offset,
                 },
-                WindowScale = mainScale and mainScale.Scale or 1,
+                UserScale = self_._userScale or 1,
                 ActiveTab = activeTabData,
                 Categories = categoryStates,
                 SettingsPage = currentSettingsPage,
@@ -6586,9 +6590,9 @@ function Library:CreateWindow(config)
                 )
                 size = main.Size
             end
-            local loadedWindowScale = interfaceData.WindowScale
-            if type(loadedWindowScale) == "number" and mainScale then
-                mainScale.Scale = math.clamp(loadedWindowScale, 0.5, 1.5)
+            -- WindowScale (old key) stored the fitted scale, not a user multiplier, so it is ignored.
+            if type(interfaceData.UserScale) == "number" then
+                self_:SetScale(interfaceData.UserScale)
             end
 
             if type(interfaceData.Categories) == "table" then
@@ -8467,13 +8471,68 @@ function Library:CreateWindow(config)
         return false
     end
 
-    function self_:SetScale(scale)
-        mainScale.Scale = math.clamp(tonumber(scale) or 1, 0.5, 1.5)
+    local function getRootSize()
+        local absolute = screenGui.AbsoluteSize
+        if absolute.X > 0 and absolute.Y > 0 then return absolute end
+        local camera = workspace.CurrentCamera
+        return camera and camera.ViewportSize or Vector2.new(1280, 720)
+    end
+
+    -- UIScale shrinks a frame toward its AnchorPoint (top-left for main and the
+    -- keybind menu). Keep the visual centre fixed and clamp back on-screen.
+    local function refitScaled(gui, oldScale, newScale, rootSize)
+        if not gui or not gui.Parent then return end
+        local w = gui.Size.X.Scale * rootSize.X + gui.Size.X.Offset
+        local h = gui.Size.Y.Scale * rootSize.Y + gui.Size.Y.Offset
+        local x = gui.Position.X.Scale * rootSize.X + gui.Position.X.Offset
+        local y = gui.Position.Y.Scale * rootSize.Y + gui.Position.Y.Offset
+        x += w * (oldScale - newScale) / 2
+        y += h * (oldScale - newScale) / 2
+        x = math.clamp(x, 0, math.max(0, rootSize.X - w * newScale))
+        y = math.clamp(y, 0, math.max(0, rootSize.Y - h * newScale))
+        gui.Position = UDim2.fromOffset(math.floor(x + 0.5), math.floor(y + 0.5))
+    end
+
+    function self_:_ApplyUIScale(scale)
+        scale = math.clamp(tonumber(scale) or 1, 0.3, 1.5)
+        local oldScale = self_._uiScale or 1
+        self_._uiScale = scale
+        Library._uiScale = scale
+
+        mainScale.Scale = scale
+        keybindMenuScale.Scale = scale
+        if self_._tooltipScale then self_._tooltipScale.Scale = scale end
+        local notifScale = Library._notifScale
+        if notifScale and notifScale.Parent then notifScale.Scale = scale end
+        for _, activity in ipairs(self_._activities or {}) do
+            if activity._uiScale and activity._uiScale.Parent then
+                activity._uiScale.Scale = scale
+            end
+        end
+
+        local rootSize = getRootSize()
+        refitScaled(main, oldScale, scale, rootSize)
+        refitScaled(keybindMenu, oldScale, scale, rootSize)
+        keybindMenuRestPosition = keybindMenu.Position
+
+        if math.abs(oldScale - scale) > 1e-3 then
+            self_:Emit("ScaleChanged", scale, oldScale)
+        end
         return self_
     end
 
+    -- SetScale is a user multiplier on top of the responsive fit.
+    function self_:SetScale(scale)
+        self_._userScale = math.clamp(tonumber(scale) or 1, 0.5, 1.5)
+        return self_:RefreshScale()
+    end
+
     function self_:GetScale()
-        return mainScale.Scale
+        return self_._uiScale or 1
+    end
+
+    function self_:GetUserScale()
+        return self_._userScale or 1
     end
 
     function self_:SetMinMaxSize(minSize, maxSize)
@@ -8497,8 +8556,12 @@ function Library:CreateWindow(config)
         self_._restoreSize = main.Size
         self_._restorePosition = main.Position
         local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+        local s = self_._uiScale or 1
         main.Position = UDim2.new(0, 12, 0, 12)
-        main.Size = UDim2.new(0, math.max(self_._minSize.X, viewport.X - 24), 0, math.max(self_._minSize.Y, viewport.Y - 24))
+        main.Size = UDim2.new(
+            0, math.max(self_._minSize.X, (viewport.X - 24) / s),
+            0, math.max(self_._minSize.Y, (viewport.Y - 24) / s)
+        )
         self_._maximized = true
         self_:Emit("Maximized")
         return self_
@@ -8607,78 +8670,56 @@ function Library:CreateWindow(config)
         end
     end
 
+    function self_:_ComputeBreakpoint(viewport)
+        local touchOnly = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+        if viewport.X < 760 or (touchOnly and viewport.Y < 500) then
+            return "Compact"
+        elseif viewport.X < 1050 or touchOnly then
+            return "Medium"
+        end
+        return "Large"
+    end
+
+    function self_:RefreshScale()
+        local viewport = getRootSize()
+        local breakpoint = self_._responsiveEnabled
+            and self_:_ComputeBreakpoint(viewport)
+            or "Large"
+
+        if self_._breakpoint ~= breakpoint then
+            local previous = self_._breakpoint
+            self_._breakpoint = breakpoint
+            self_:_ApplyBreakpointLayout(breakpoint)
+            self_:Emit("BreakpointChanged", breakpoint, previous)
+        end
+
+        local scale = self_._userScale or 1
+        if self_._responsiveEnabled then
+            local margin = breakpoint == "Compact" and 8 or (breakpoint == "Medium" and 16 or 30)
+            local fit = math.min(
+                1,
+                (viewport.X - margin * 2) / math.max(self_._baseSize.X, 1),
+                (viewport.Y - margin * 2) / math.max(self_._baseSize.Y, 1)
+            )
+            scale = math.max(self_._minScale, fit) * (self_._userScale or 1)
+        end
+
+        return self_:_ApplyUIScale(scale)
+    end
+
     function self_:EnableResponsive(enabled)
         self_._responsiveEnabled = enabled ~= false
 
-        local function refreshScale()
-            if not self_._responsiveEnabled then return end
-
-            local camera = workspace.CurrentCamera
-            local viewport = camera
-                and camera.ViewportSize
-                or Vector2.new(1280, 720)
-
-            local breakpoint
-            if viewport.X < 760 then
-                breakpoint = "Compact"
-            elseif viewport.X < 1050 then
-                breakpoint = "Medium"
-            else
-                breakpoint = "Large"
-            end
-
-            if self_._breakpoint ~= breakpoint then
-                local previous = self_._breakpoint
-                self_._breakpoint = breakpoint
-                self_:_ApplyBreakpointLayout(breakpoint)
-                self_:Emit("BreakpointChanged", breakpoint, previous)
-            end
-
-            local margin = breakpoint == "Compact" and 16 or 30
-            local target = math.min(
-                1,
-                (viewport.X - margin) / math.max(self_._baseSize.X, 1),
-                (viewport.Y - margin) / math.max(self_._baseSize.Y, 1)
+        -- ScreenGui.AbsoluteSize covers resolution changes, rotation and safe-area insets.
+        if not self_._responsiveConnection then
+            self_._responsiveConnection = self_:Track(
+                screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+                    self_:RefreshScale()
+                end)
             )
-
-            local minimumScale = breakpoint == "Compact" and 0.66 or 0.72
-            mainScale.Scale = math.clamp(target, minimumScale, 1)
         end
 
-        local function bindCamera()
-            if self_._responsiveConnection then
-                self_._responsiveConnection:Disconnect()
-                self_._responsiveConnection = nil
-            end
-
-            local camera = workspace.CurrentCamera
-            if camera then
-                self_._responsiveConnection =
-                    camera:GetPropertyChangedSignal("ViewportSize"):Connect(
-                        refreshScale
-                    )
-                self_:Track(self_._responsiveConnection)
-            end
-
-            refreshScale()
-        end
-
-        if not self_._responsiveCameraConnection then
-            self_._responsiveCameraConnection =
-                workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(
-                    bindCamera
-                )
-            self_:Track(self_._responsiveCameraConnection)
-        end
-
-        if self_._responsiveEnabled then
-            bindCamera()
-        elseif self_._responsiveConnection then
-            self_._responsiveConnection:Disconnect()
-            self_._responsiveConnection = nil
-            mainScale.Scale = 1
-        end
-
+        self_:RefreshScale()
         return self_
     end
 
@@ -9344,7 +9385,7 @@ function Library:CreateWindow(config)
                 VerticalAlignment = Enum.VerticalAlignment.Top,
             }),
         })
-        local panelScale = create("UIScale", { Scale = 0.975, Parent = panel })
+        local panelScale = create("UIScale", { Scale = 0.975 * (self_._uiScale or 1), Parent = panel })
 
         local header = create("Frame", {
             Name = "Header",
@@ -9451,6 +9492,7 @@ function Library:CreateWindow(config)
         })
 
         local api = {
+            _uiScale = panelScale,
             Type = "Activity",
             Instance = panel,
             Panel = panel,
@@ -9963,7 +10005,7 @@ function Library:CreateWindow(config)
             end
             if immediate == true then finish(); return api end
             tween(panel, { GroupTransparency = 1, Position = panel.Position + UDim2.new(0, 10, 0, -2) }, 0.17, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
-            tween(panelScale, { Scale = 0.97 }, 0.17, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+            tween(panelScale, { Scale = 0.97 * (self_._uiScale or 1) }, 0.17, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
             task.delay(0.18, finish)
             return api
         end
@@ -9997,7 +10039,7 @@ function Library:CreateWindow(config)
 
         panel.Position = panel.Position + UDim2.new(0, 12, 0, 0)
         tween(panel, { GroupTransparency = 0, Position = panel.Position - UDim2.new(0, 12, 0, 0) }, 0.20, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-        tween(panelScale, { Scale = 1 }, 0.20, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+        tween(panelScale, { Scale = self_._uiScale or 1 }, 0.20, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
         if config.Counter ~= nil or config.Total ~= nil then api:SetCounter(config.Counter or 0, config.Total, config.CounterLabel) end
         if config.Target ~= nil then api:SetTarget(config.Target, config.TargetLabel) end
@@ -12152,10 +12194,11 @@ function Library:CreateWindow(config)
         enabled = enabled == true
 
         if not enabled then
-            if self_._mobileToggleButton then
-                self_._mobileToggleButton:Destroy()
-                self_._mobileToggleButton = nil
+            if self_._mobileToggleGui then
+                self_._mobileToggleGui:Destroy()
+                self_._mobileToggleGui = nil
             end
+            self_._mobileToggleButton = nil
             return self_
         end
 
@@ -12167,6 +12210,19 @@ function Library:CreateWindow(config)
         local xScale = side == "left" and 0 or 1
         local xOffset = side == "left" and 18 or -18
         local anchorX = side == "left" and 0 or 1
+
+        -- Separate ScreenGui: closing/toggling disables the main ScreenGui,
+        -- which would otherwise hide this button too and the UI could never be
+        -- reopened on a device without a keyboard.
+        local toggleGui = create("ScreenGui", {
+            Name = "MistMobileToggle",
+            ResetOnSpawn = false,
+            ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+            DisplayOrder = screenGui.DisplayOrder + 1,
+            Parent = getGuiParent(),
+        })
+        self_._mobileToggleGui = toggleGui
+        self_:Track(toggleGui)
 
         local button = create("TextButton", {
             Name = "MistMobileToggle",
@@ -12181,8 +12237,23 @@ function Library:CreateWindow(config)
             Position = UDim2.new(xScale, xOffset, 0.55, 0),
             Size = UDim2.new(0, 44, 0, 44),
             ZIndex = 10000,
-            Parent = screenGui,
+            Parent = toggleGui,
         }, { corner(12), stroke(Theme.StrokeTabBar, 1, 0.2) })
+
+        local logo = create("ImageLabel", {
+            Name = "Logo",
+            BackgroundTransparency = 1,
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.new(0.5, 0, 0.5, 0),
+            Size = UDim2.new(1, -8, 1, -8),
+            ScaleType = Enum.ScaleType.Fit,
+            Image = "",
+            Visible = false,
+            ZIndex = 10001,
+            Parent = button,
+        }, { corner(9) })
+        self_._mobileToggleLogo = logo
+        self_._mobileToggleText = tostring(options.Text or "M")
 
         local scale = create("UIScale", { Scale = 1, Parent = button })
         button.MouseEnter:Connect(function()
@@ -12199,6 +12270,25 @@ function Library:CreateWindow(config)
 
         dragController:Attach(button, button)
         self_._mobileToggleButton = button
+        self_:SetMobileToggleImage(options.Image or config.MobileToggleImage)
+        return self_
+    end
+
+    -- Accepts an asset id (number or "123"), "rbxassetid://123" or any image URL.
+    -- nil/"" falls back to the text label.
+    function self_:SetMobileToggleImage(image)
+        local button = self_._mobileToggleButton
+        local logo = self_._mobileToggleLogo
+        if not button or not logo then return self_ end
+
+        local value = image ~= nil and tostring(image) or ""
+        if value:match("^%d+$") then
+            value = "rbxassetid://" .. value
+        end
+
+        logo.Image = value
+        logo.Visible = value ~= ""
+        button.Text = value ~= "" and "" or (self_._mobileToggleText or "M")
         return self_
     end
 
@@ -12220,7 +12310,8 @@ function Library:CreateWindow(config)
     self_:SetKeyboardNavigationEnabled(config.KeyboardNavigation ~= false)
     self_:SetGamepadNavigationEnabled(config.GamepadNavigation ~= false)
     self_:SetResizable(false)
-    if config.MobileToggle == true then
+    local touchOnly = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+    if config.MobileToggle == true or (config.MobileToggle == nil and touchOnly) then
         self_:SetMobileToggleEnabled(true, { Side = config.MobileToggleSide })
     end
 
@@ -19285,7 +19376,9 @@ local function ensureNotifHolder(screenGui)
             VerticalAlignment = Enum.VerticalAlignment.Top,
             SortOrder = Enum.SortOrder.LayoutOrder,
         }),
+        create("UIScale", { Name = "MistUIScale", Scale = Library._uiScale or 1 }),
     })
+    Library._notifScale = NotifHolder:FindFirstChild("MistUIScale")
 
     applyNotifHolderLayout(NotifHolder)
     return NotifHolder
