@@ -1465,16 +1465,31 @@ function DragController.new(maid)
     self._maid = maid
     self._active = nil
 
+    -- A touch drag must follow the exact InputObject that started it (each finger
+    -- press is a new object). A mouse drag follows the MouseMovement stream.
+    local function isActiveInput(active, input)
+        if active.IsMouse then
+            return input.UserInputType == Enum.UserInputType.MouseMovement
+        end
+        return input == active.Input
+    end
+
     self._maid:Give(UserInputService.InputChanged:Connect(function(input)
         local active = self._active
         if not active
-            or input ~= active.Input
+            or not isActiveInput(active, input)
             or active.Target:GetAttribute("DragLocked") == true then
             return
         end
 
         local delta = input.Position - active.StartInput
         local startPos = active.StartPosition
+
+        -- Lets tap handlers (e.g. the mobile toggle) ignore the release after a drag.
+        if not active.Moved and delta.Magnitude > 6 then
+            active.Moved = true
+            active.Target:SetAttribute("MistDragMoved", true)
+        end
 
         active.Target.Position = UDim2.new(
             startPos.X.Scale,
@@ -1484,19 +1499,21 @@ function DragController.new(maid)
         )
     end))
 
+    -- Fallback release: input.Changed can miss the End state if the finger lifts
+    -- outside the handle, which used to leave a stale drag behind.
+    self._maid:Give(UserInputService.InputEnded:Connect(function(input)
+        local active = self._active
+        if not active then return end
+        if input == active.Input
+            or (active.IsMouse and input.UserInputType == Enum.UserInputType.MouseButton1) then
+            self._active = nil
+        end
+    end))
+
     return self
 end
 
 function DragController:Attach(handle, target)
-    local candidateInput = nil
-
-    self._maid:Give(handle.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-            or input.UserInputType == Enum.UserInputType.Touch then
-            candidateInput = input
-        end
-    end))
-
     self._maid:Give(handle.InputBegan:Connect(function(input)
         if target:GetAttribute("DragLocked") == true then
             return
@@ -1507,11 +1524,11 @@ function DragController:Attach(handle, target)
             return
         end
 
-        local activeInput = candidateInput or input
-
+        target:SetAttribute("MistDragMoved", false)
         self._active = {
             Target = target,
-            Input = activeInput,
+            Input = input,
+            IsMouse = input.UserInputType == Enum.UserInputType.MouseButton1,
             StartInput = input.Position,
             StartPosition = target.Position,
         }
@@ -12265,6 +12282,11 @@ function Library:CreateWindow(config)
             smoothTween(scale, { Scale = 1 }, MOTION.Fast)
         end)
         button.MouseButton1Click:Connect(function()
+            -- Releasing after dragging the button shouldn't also toggle the UI.
+            if button:GetAttribute("MistDragMoved") == true then
+                button:SetAttribute("MistDragMoved", false)
+                return
+            end
             self_:Toggle()
         end)
 
